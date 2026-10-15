@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<!-- SCAN-2, avenant SCAN-2-AV3 §2 « Page publiée » et AC-34 : la source de la page que Thomas publie sur
+     l'hébergeur (https://tjiriki.github.io/mtg-scan/v1/). FICHIER UNIQUE : HTML, CSS et script ensemble,
+     AUCUNE ressource externe (DIR-SCAN-18) — pas de CDN, pas de police téléchargée, pas d'image. La politique
+     de contenu est portée par cette balise <meta> parce que la page est servie par un hébergeur statique sur
+     lequel l'application n'écrit aucun en-tête.
+     Ce que la politique ferme, et pourquoi elle est écrit ainsi :
+       default-src 'none'     : rien, par défaut.
+       script-src/style-src   : 'unsafe-inline' est contraint — la page est un fichier unique, son script ne
+                                peut donc pas venir d'un fichier externe ni d'un nonce que l'hébergeur ne pose pas.
+       connect-src http:      : SEULE destination possible, le PC local. Les requêtes sortantes en https: sont
+                                refusées, donc la clef du fragment ne peut pas être envoyée sur le réseau par
+                                une requête détournée ; l'adresse du PC arrive par le fragment et ne peut pas
+                                être écrite à l'avance, d'où le schéma seul.
+       img/font/object/media  : 'none' — la page n'affiche rien d'autre que du texte.
+       frame-ancestors/base-uri/form-action : 'none' — la page n'embarque, ne se charge et ne transmet rien.
+     Le referrer est coupé pareillement par une balise : la clef ne doit se retrouver dans aucun Referer. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src http:; img-src 'none'; font-src 'none'; object-src 'none'; media-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>MTG Manager — Connexion au PC</title>
+<style>
+:root { color-scheme: light dark; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+    margin: 0;
+    padding: 28px 20px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 19px;
+    line-height: 1.45;
+    background: #14161a;
+    color: #f2f3f5;
+}
+main { max-width: 32em; margin: 0 auto; }
+.marque {
+    margin: 0 0 18px;
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9aa3b2;
+}
+/* L'état tient sur une ligne courte : c'est ce que Thomas lit sur l'écran du téléphone posé (AC-34). */
+.etat {
+    margin: 0;
+    font-size: 25px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+.detail {
+    margin: 14px 0 0;
+    font-size: 16px;
+    color: #b9c0cc;
+    overflow-wrap: anywhere;
+}
+/* Le vert et le rouge ne portent pas l'information seuls : le mot français l'a déjà dite (AC-34). */
+.connecte { color: #57d38c; }
+.refus { color: #ff8f8f; }
+.attente { color: #f0c674; }
+</style>
+</head>
+<body>
+<main>
+    <p class="marque">MTG Manager</p>
+    <p id="etat" class="etat" role="status" aria-live="polite">Ouverture…</p>
+    <p id="detail" class="detail"></p>
+    <noscript class="detail">Cette page a besoin de JavaScript pour chiffrer ses échanges avec le PC.</noscript>
+</main>
+<script>
+"use strict";
+
+// SCAN-2, avenant SCAN-2-AV3 (AC-29 à AC-34) — ce que la page sait du protocole. Les constantes ci-dessous
+// reproduisent les valeurs du PC (src/MTGManager.App/Scan/Serveur/ChiffrementScan.cs, SessionChiffree.cs,
+// ServeurScanLocal.cs, OriginesScan.cs) : elles se réécrivent ENSEMBLE, sinon l'étiquette d'authentification
+// ne passe plus et rien ne s'apparie — c'est le sens d'AC-33.
+//
+// Ce que cette page ne fait pas : elle n'affiche et n'écrit nulle part la clef du fragment (AC-28,
+// DIR-SCAN-21 : ni console, ni titre, ni stockage) ; elle n'appelle personne d'autre que le PC (la CSP
+// « connect-src http: » le refuse, DIR-SCAN-18) ; elle ne conserve rien après sa fermeture — clef et
+// identifiant vivent en mémoire de script, dans aucun stockage du navigateur ; elle ne relit jamais le
+// fragment effacé, un code ne sert qu'une fois (AC-30).
+
+const PROTOCOLE = "MTGSCAN1";                // ChiffrementScan.VersionDeProtocole
+const SENS_TELEPHONE = 1;                    // ChiffrementScan.SensTelephoneVersPc
+const SENS_PC = 2;                           // ChiffrementScan.SensPcVersTelephone
+const ROUTE_APPAIRAGE = "/apparier";         // la route qui lie la page à la clef, seule à porter l'identifiant
+const ROUTE_ETAT = "/etat";                  // le battement de cinq secondes, dont la réponse est chiffrée
+const ROUTE_FIN = "/fin";                    // la page se ferme, l'écran du PC passe à « Téléphone déconnecté »
+const EN_TETE_IDENTIFIANT = "X-MTG-Pair";    // SessionChiffree.NomEnTeteTelephone
+const TAILLE_CLE = 32;                       // ChiffrementScan.TailleDeCle : 256 bits, DIR-SCAN-4 v2
+const TAILLE_IDENTIFIANT = 16;               // SessionChiffree.TailleDIdentifiantTelephone
+const TAILLE_ETIQUETTE = 16;                 // ChiffrementScan.TailleDEtiquette : 128 bits, DIR-SCAN-16
+const TAILLE_NONCE = 12;                     // ChiffrementScan.TailleDeNonce : 96 bits, jamais tiré au hasard
+const TAILLE_COMPTEUR = 8;                   // ChiffrementScan.TailleDeCompteur, en tête de chaque message
+const INTERVALLE_BATTEMENT = 5000;           // SessionChiffree.IntervalleDeBattement : quinze secondes sans
+                                             // battement affichent « Téléphone inactif » sur le PC (AC-36)
+
+// AC-34 : les deux phrases imposées, mot pour mot, accents compris.
+const MESSAGE_CONNECTE = "Téléphone connecté à MTG Manager.";
+const MESSAGE_REFUS = "Ce code a déjà servi ou a expiré. Sur le PC, touchez « Nouveau code d'appairage », puis scannez le nouveau code.";
+
+// Ce que le PC rend dans la réponse chiffrée (PagesScan.EtatChiffreJson : « etat » vaut attente | connecte |
+// inactif | deconnecte, AC-34 et AC-36), traduit en français ici — le mot-clef ASCII n'est jamais montré.
+const ETATS = {
+    attente: "Le PC attend un code plus récent. Scanne celui qui vient d'être affiché.",
+    connecte: MESSAGE_CONNECTE,
+    inactif: "Téléphone inactif aux yeux du PC. Garde cette page ouverte.",
+    deconnecte: "Déconnecté du PC. Ouvre l'écran Scanner, puis scanne le code qu'il affiche.",
+    inconnu: "Le PC a répondu un état que cette page ne connaît pas."
+};
+
+// Les phrases que l'avenant n'impose pas mais qu'un téléphone mérite : elles disent quoi faire, jamais la
+// clef ni le moindre détail du message (AC-28, et le refus du PC qui ne se raconte pas, DIR-SCAN-9).
+const MESSAGE_SANS_FRAGMENT = "Ce lien n'est pas un code de connexion. Ouvre l'écran Scanner du PC et scanne le code qu'il affiche.";
+const MESSAGE_FORMAT = "Ce code n'est pas au format de cette page. Scanne le code affiché par le PC.";
+const MESSAGE_CLE = "Ce code ne porte pas de clef valide. Scanne le code affiché par le PC.";
+const MESSAGE_HORS_ORIGIN = "Cette page n'est pas servie depuis l'origine que le PC attend. Ouvre-la depuis l'adresse du PC.";
+const MESSAGE_TRANSPORT = "Le PC ne répond pas. Vérifie qu'il est allumé, que l'écran Scanner est ouvert, et que le téléphone est sur le même réseau.";
+
+const cryptage = new TextEncoder();
+// ————— base64url sans remplissage (ChiffrementScan.EncoderBase64Url, OriginesScan.UrlDuQr) —————
+
+function base64UrlEnOctets(valeur) {
+    if (typeof valeur !== "string" || valeur === "")
+        return null;
+
+    const normalisee = valeur.replace(/-/g, "+").replace(/_/g, "/");
+    const bourrelet = "=".repeat((4 - (normalisee.length % 4)) % 4);
+    let decode;
+    try {
+        decode = atob(normalisee + bourrelet);
+    } catch (horsAlphabet) {
+        // atob lève sur tout caractère hors alphabet : la clef est alors absente, jamais déformée.
+        return null;
+    }
+
+    const octets = new Uint8Array(decode.length);
+    for (let i = 0; i < decode.length; i++)
+        octets[i] = decode.charCodeAt(i);
+    return octets;
+}
+
+function octetsEnBase64Url(octets) {
+    let texte = "";
+    for (let i = 0; i < octets.length; i++)
+        texte += String.fromCharCode(octets[i]);
+    return btoa(texte).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function octetsEnHexadecimal(octets) {
+    let texte = "";
+    for (let i = 0; i < octets.length; i++)
+        texte += octets[i].toString(16).padStart(2, "0");
+    return texte;
+}
+
+// ————— les trois pièces du message (avenant §2 « Nonce », « Données associées », « Corps d'un message ») —————
+
+// Le nonce : octet 0 = le sens, octets 1 à 3 = zéro, octets 4 à 11 = le compteur non signé 64 bits
+// gros-boutiste. Aucun tirage au hasard ici — deux messages portant le même compteur porteraient le même
+// nonce, et c'est le compteur strictement croissant tenu par la page qui rend le second impossible (AC-30).
+function nonce(sens, compteur) {
+    const valeur = new Uint8Array(TAILLE_NONCE);
+    valeur[0] = sens;
+    new DataView(valeur.buffer).setBigUint64(4, compteur, false);
+    return valeur;
+}
+
+// MTGSCAN1|<sens>|<route>|<compteur> en UTF-8, exactement : un message scellé pour /etat ne se relit donc
+// pas sur /apparier (AC-29, DIR-SCAN-16).
+function donneesAssociees(sens, route, compteur) {
+    return cryptage.encode(PROTOCOLE + "|" + sens + "|" + route + "|" + compteur.toString());
+}
+
+// L'enveloppe [compteur 8][chiffré][étiquette 16] : WebCrypto rend le chiffré suivi de l'étiquette, dans
+// l'ordre où le PC les attend — c'est cette suite d'octets que la sonde AC-33 compare avec .NET.
+async function sceller(cle, sens, route, compteur, clair) {
+    const donnees = cryptage.encode(clair);
+    const scelle = await crypto.subtle.encrypt(
+        {
+            name: "AES-GCM",
+            iv: nonce(sens, compteur),
+            additionalData: donneesAssociees(sens, route, compteur),
+            tagLength: 8 * TAILLE_ETIQUETTE
+        },
+        cle,
+        donnees);
+
+    const corps = new Uint8Array(scelle);
+    const message = new Uint8Array(TAILLE_COMPTEUR + corps.length);
+    new DataView(message.buffer).setBigUint64(0, compteur, false);
+    message.set(corps, TAILLE_COMPTEUR);
+    return message;
+}
+
+// Le compteur relu en tête d'une réponse, avant toute autre lecture de son contenu (DIR-SCAN-17).
+function lisCompteur(message) {
+    return new DataView(message.buffer, message.byteOffset, message.byteLength).getBigUint64(0, false);
+}
+
+// La réponse du PC ouverte : null quand l'enveloppe est trop courte ou que l'étiquette ne suit pas — la
+// page ne lit alors aucun fragment de clair, comme le PC pour la requête qu'il reçoit (AC-29).
+async function ouvrir(cle, sens, route, compteur, message) {
+    if (message.length < TAILLE_COMPTEUR + TAILLE_ETIQUETTE)
+        return null;
+
+    const clair = await crypto.subtle.decrypt(
+        {
+            name: "AES-GCM",
+            iv: nonce(sens, compteur),
+            additionalData: donneesAssociees(sens, route, compteur),
+            tagLength: 8 * TAILLE_ETIQUETTE
+        },
+        cle,
+        message.subarray(TAILLE_COMPTEUR));
+
+    return new Uint8Array(clair);
+}
+
+// La clef n'est jamais manipulable par le script après son import : extractable = false, usage unique par
+// sens. Le générateur cryptographique du navigateur fournit les 16 octets de l'identifiant de la page.
+function importeCle(octetsDeClef) {
+    return crypto.subtle.importKey("raw", octetsDeClef, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+function tireIdentifiantTelephone() {
+    const octets = new Uint8Array(TAILLE_IDENTIFIANT);
+    crypto.getRandomValues(octets);
+    return octetsEnBase64Url(octets);
+}
+// ————— la session de la page : fragment, transport, appairage (AC-30, AC-31, AC-34) —————
+
+const champEtat = document.getElementById("etat");
+const champDetail = document.getElementById("detail");
+
+// Toute la mémoire de la page. Rien n'y est écrit dans un stockage du navigateur : fermer l'onglet tue la
+// clef, l'identifiant et les compteurs (DIR-SCAN-5 v2, AC-28).
+const seance = {
+    url: "",                         // http://<adresse>:<port>, sans chemin ni fragment
+    cle: null,                       // la CryptoKey importée du fragment, non extractible
+    identifiant: "",                 // les 16 octets tirés par la page, sur la seule route /apparier
+    prochainCompteur: 0n,            // sens téléphone : le dernier compteur ÉMIS (le premier porté sera 1)
+    dernierCompteurPc: 0n,           // sens PC : le plus grand compteur déjà ouvert (anti-rejeu, AC-30)
+    aparie: false,
+    enVol: false,
+    arret: false,
+    minuteur: null,
+    messageDeFin: null,              // le message /fin scellé d'avance, prêt à partir en keepalive
+    finEnvoyee: false
+};
+
+function affiche(texte, classe, detail) {
+    champEtat.textContent = texte;
+    champEtat.className = "etat" + (classe ? " " + classe : "");
+    champDetail.textContent = detail || "";
+}
+
+// Le compteur du téléphone est unique pour les trois routes — le PC n'en tient qu'un par sens
+// (SessionChiffree.AccepteCompteur) — et ne fait que croître : un message refusé au passage laisse donc une
+// valeur non utilisée, ce que le PC accepte puisqu'il n'exige que la croissance strictement.
+function emetsCompteur() {
+    seance.prochainCompteur += 1n;
+    return seance.prochainCompteur;
+}
+
+// Une requête vers le PC. targetAddressSpace: "local" (AC-34) est ce que Chrome et Brave exigent pour
+// qu'une page en https parle à une adresse du réseau privé ; les autres navigateurs l'ignorent.
+// credentials: "omit" : aucun cookie, aucun en-tête d'authentification — la clef fait tout (DIR-SCAN-5 v2).
+async function envoie(route, message, options) {
+    const enTetes = { "Content-Type": "application/octet-stream" };
+    if (options && options.identifiant)
+        enTetes[EN_TETE_IDENTIFIANT] = seance.identifiant;
+
+    return await fetch(seance.url + route, {
+        method: "POST",
+        mode: "cors",
+        credentials: "omit",
+        cache: "no-store",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+        headers: enTetes,
+        body: message,
+        keepalive: !!(options && options.keepalive),
+        targetAddressSpace: "local"
+    });
+}
+
+// La réponse chiffrée du PC, ouverte. Le compteur doit être STRICTEMENT plus grand que le dernier ouvert —
+// une réponse volée sur le réseau ne se relit pas deux fois (AC-30) — et les trous sont tolérés : un
+// battement dont la réponse s'est perue laisse un compteur non vu, ce qui n'est pas un rejeu. C'est le seul
+// écart assumé à PagesScan.MessagePresse, qui exige la valeur exacte parce qu'un test ne fait qu'un échange.
+async function ouvreReponse(route, octets) {
+    if (octets.length < TAILLE_COMPTEUR + TAILLE_ETIQUETTE)
+        return null;
+
+    const recu = lisCompteur(octets);
+    if (recu <= seance.dernierCompteurPc)
+        return null;
+
+    let clair;
+    try {
+        clair = await ouvrir(seance.cle, SENS_PC, route, recu, octets);
+    } catch (etiquetteRejetee) {
+        return null;
+    }
+
+    if (clair === null)
+        return null;
+
+    seance.dernierCompteurPc = recu;
+    try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(clair);
+    } catch (texteMalForme) {
+        return null;
+    }
+}
+
+// AC-31 : le premier message porte l'identifiant tiré par la page et lie la clef à cette origine ; après
+// lui, /etat et /fin se servent à la seule possession de la clef. Un 401 veut dire que la clef du QR n'est
+// plus celle du PC : c'est la phrase d'AC-34, et rien d'autre.
+async function apparie() {
+    const message = await sceller(
+        seance.cle, SENS_TELEPHONE, ROUTE_APPAIRAGE, emetsCompteur(), "{\"v\":1,\"type\":\"apparier\"}");
+    const reponse = await envoie(ROUTE_APPAIRAGE, message, { identifiant: true });
+
+    if (reponse.status === 403) {
+        // Le PC n'a pas reconnu l'origine de la page (AC-32) : ce n'est pas le code qui a servi, c'est
+        // l'adresse depuis laquelle la page est ouverte. La phrase d'AC-34 serait ici une fausse piste.
+        affiche(MESSAGE_HORS_ORIGIN, "refus");
+        arrete();
+        return false;
+    }
+
+    if (reponse.status === 401) {
+        affiche(MESSAGE_REFUS, "refus");
+        arrete();
+        return false;
+    }
+
+    if (!reponse.ok) {
+        affiche(MESSAGE_TRANSPORT, "attente");
+        return false;
+    }
+
+    const texte = await ouvreReponse(ROUTE_APPAIRAGE, new Uint8Array(await reponse.arrayBuffer()));
+    if (texte === null) {
+        affiche(MESSAGE_REFUS, "refus");
+        arrete();
+        return false;
+    }
+
+    seance.aparie = true;
+    affiche(MESSAGE_CONNECTE, "connecte");   // AC-34, mot pour mot
+    return true;
+}
+// ————— le battement de cinq secondes, l'état rendu par le PC, la fermeture (AC-34, AC-36) —————
+
+// Le message /fin est scellé à l'avance, juste après chaque échange réussi : pagehide ne laisse pas le temps
+// d'attendre WebCrypto. Il réserve le compteur suivant, donc reste toujours strictement supérieur au dernier
+// message parti (AC-30), et il n'est tiré qu'une fois.
+async function prepareMessageDeFin() {
+    seance.messageDeFin = await sceller(
+        seance.cle, SENS_TELEPHONE, ROUTE_FIN, emetsCompteur(), "{\"v\":1,\"type\":\"fin\"}");
+}
+
+function envoieLaFin() {
+    if (seance.finEnvoyee || seance.messageDeFin === null)
+        return;
+
+    const message = seance.messageDeFin;
+    seance.messageDeFin = null;
+    seance.finEnvoyee = true;
+
+    // La réponse n'est pas attendue : la page est en train de fermer. keepalive est ce qui laisse le
+    // navigateur finir l'envoi après la fermeture (AC-34 : « envoie /fin à sa fermeture, en keepalive »).
+    envoie(ROUTE_FIN, message, { keepalive: true }).catch(function (rejet) {
+        // /fin peut ne pas partir : le PC passera de lui-même à « Téléphone inactif » puis « Téléphone
+        // déconnecté » (AC-36), et la clef meurt à la fermeture de l'écran du PC (DIR-SCAN-5 v2).
+    });
+}
+
+// Couper le battement et oublier le message de fin : après un refus, la clef n'est plus la bonne, il n'y a
+// plus rien à fermer proprement.
+function arrete() {
+    seance.arret = true;
+    if (seance.minuteur !== null) {
+        clearInterval(seance.minuteur);
+        seance.minuteur = null;
+    }
+    seance.messageDeFin = null;
+}
+
+// Un battement : /etat, dont la réponse chiffrée porte l'état de la session (AC-34, AC-36).
+async function demandeEtat() {
+    const message = await sceller(
+        seance.cle, SENS_TELEPHONE, ROUTE_ETAT, emetsCompteur(), "{\"v\":1,\"type\":\"etat\"}");
+    const reponse = await envoie(ROUTE_ETAT, message, null);
+
+    if (reponse.status === 403) {
+        // Origine refusée en cours de route (AC-32) : la clef n'y est pour rien, c'est l'adresse de la page.
+        affiche(MESSAGE_HORS_ORIGIN, "refus");
+        arrete();
+        return false;
+    }
+
+    if (reponse.status === 401) {
+        // AC-30 : le PC a changé de clef entre deux battements — « Nouveau code d'appairage » a été touché.
+        affiche(MESSAGE_REFUS, "refus");
+        arrete();
+        return false;
+    }
+
+    if (!reponse.ok) {
+        affiche(MESSAGE_TRANSPORT, "attente");
+        return true;
+    }
+
+    const texte = await ouvreReponse(ROUTE_ETAT, new Uint8Array(await reponse.arrayBuffer()));
+    if (texte === null) {
+        affiche(MESSAGE_REFUS, "refus");
+        arrete();
+        return false;
+    }
+
+    let recu = null;
+    try {
+        recu = JSON.parse(texte);
+    } catch (jsonRejete) {
+        recu = null;
+    }
+
+    const mot = recu !== null && typeof recu.etat === "string" ? recu.etat : "";
+    if (mot === "deconnecte") {
+        // AC-36 : le PC a reçu un /fin ou compte trente minutes sans message authentifié. La session est
+        // close, le battement s'arrête ici — un nouveau QR est le seul chemin qui la rouvre.
+        affiche(ETATS.deconnecte, "refus");
+        arrete();
+        return false;
+    }
+
+    const libelle = Object.prototype.hasOwnProperty.call(ETATS, mot) ? ETATS[mot] : ETATS.inconnu;
+    affiche(libelle, mot === "connecte" ? "connecte" : (mot === "inactif" ? "attente" : "refus"));
+    return true;
+}
+
+// La boucle de l'écran. Un seul échange à la fois : un battement qui traîne sur un réseau encombré passe son
+// tour plutôt que de partir en parallèle, ce qui désordonnerait les compteurs. Les tentatives reprennent
+// toutes les cinq secondes tant que la page est ouverte, y compris après un appairage manqué — un téléphone
+// qui a scanné trop tôt n'a rien à rescanner. (Un onglet caché est mis au ralenti par le navigateur ; le PC
+// affiche alors « Téléphone inactif », ce qui est exactement l'état des lieux.)
+async function battement() {
+    if (seance.enVol || seance.arret)
+        return;
+
+    seance.enVol = true;
+    try {
+        const poursuite = seance.aparie ? await demandeEtat() : await apparie();
+        if (poursuite && !seance.arret)
+            await prepareMessageDeFin();
+    } catch (horsReseau) {
+        affiche(MESSAGE_TRANSPORT, "attente");
+    } finally {
+        seance.enVol = false;
+    }
+}
+// ————— le fragment du QR, la sonde d'interopérabilité, le démarrage (AC-28, AC-30, AC-33, AC-34) —————
+
+const MOTIF_V4 = /^(\d{1,3}\.){3}\d{1,3}$/;
+const MOTIF_V6 = /^[0-9A-Fa-f:]+$/;
+const MOTIF_PORT = /^\d{1,5}$/;
+
+function refusDeFragment(motif) {
+    return { erreur: motif, adresse: "", port: "", octetsDeClef: null };
+}
+
+// Le fragment #v=1&a=<adresse>&p=<port>&k=<clef> (avenant §2, OriginesScan.UrlDuQr) : rien d'autre n'y est
+// admis, et « v » vaut 1 ou le code ne vient pas de cette version du protocole. La clef relue ici n'est
+// écrite ni à l'écran ni au journal (AC-28, DIR-SCAN-21) ; l'adresse et le port, si, mais seulement dans la
+// phrase d'erreur, où ils ne figurent pas.
+function litFragment() {
+    const brut = location.hash.replace(/^#/, "");
+    if (brut === "")
+        return refusDeFragment("absent");
+
+    const parametres = new URLSearchParams(brut);
+    const adresse = parametres.get("a");
+    const port = parametres.get("p");
+    const clef = parametres.get("k");
+    if (parametres.get("v") !== "1" || adresse === null || port === null || clef === null)
+        return refusDeFragment("format");
+
+    const octetsDeClef = base64UrlEnOctets(clef);
+    if (octetsDeClef === null || octetsDeClef.length !== TAILLE_CLE)
+        return refusDeFragment("clef");
+
+    const numero = Number(port);
+    const adresseValide = (MOTIF_V4.test(adresse) || MOTIF_V6.test(adresse)) &&
+        MOTIF_PORT.test(port) && numero >= 1 && numero <= 65535;
+    if (!adresseValide)
+        return refusDeFragment("format");
+
+    return { erreur: "", adresse: adresse, port: port, octetsDeClef: octetsDeClef };
+}
+
+// AC-34 : « lit le fragment puis l'efface de la barre d'adresse ». Le fragment ne reste donc ni dans
+// l'historique, ni dans une capture d'écran ultérieure, et la page ne peut pas le relire par mégarde — un
+// second appairage avec la même clef serait de toute façon refusé (AC-30).
+function effaceLeFragment() {
+    try {
+        history.replaceState(null, "", location.pathname + location.search);
+    } catch (historiqueRefuse) {
+        // Un fichier ouvert en « file:// » refuse parfois replaceState : le fragment reste affiché dans la
+        // barre, le fonctionnement de la page n'en est pas changé.
+    }
+}
+
+// AC-33 : le même vecteur (clef, sens, route, compteur, clair) doit donner les mêmes octets chiffrés dans
+// .NET et ici. Ce bloc ne sert qu'à la sonde — Edge sans tête lancé sur « index.html?sonde=1&… » relève
+// l'hexadécimal affiché dans le DOM — et ne fait aucune requête : il n'utilise ni le fragment, ni la session,
+// ni le réseau. Le vecteur vient des paramètres d'URL (AC-33), donc la page reste ouverte telle quelle après
+// l'appairage : rien de ce que la sonde lit ne sort du téléphone. Elle ne révèle aucun secret — la clef qu'elle
+// scelle est celle que le test lui donne — et n'ouvre aucune porte : les paramètres ne sont pas utilisés par
+// la session, dont le seul point d'entrée reste le fragment du QR (AC-30).
+const SONDE = {
+    clef: "",
+    sens: 0,
+    route: ROUTE_ETAT,
+    compteur: "",
+    clair: ""
+};
+
+function remplitSonde(parametres) {
+    const clef = parametres.get("k");
+    const compteur = parametres.get("c");
+    if (clef === null || compteur === null || !/^\d+$/.test(compteur))
+        return false;
+
+    const sens = parametres.get("sens");
+    const route = parametres.get("route");
+    SONDE.clef = clef;
+    SONDE.compteur = compteur;
+    SONDE.sens = sens === null ? SENS_TELEPHONE : Number(sens);
+    SONDE.route = route === null ? ROUTE_ETAT : route;
+    SONDE.clair = parametres.get("clair") === null ? "" : parametres.get("clair");
+    return SONDE.sens === SENS_TELEPHONE || SONDE.sens === SENS_PC;
+}
+
+function estLaSonde() {
+    const parametres = new URLSearchParams(location.search);
+    return parametres.get("sonde") === "1" ? parametres : null;
+}
+
+async function sondeAc33(parametres) {
+    if (!remplitSonde(parametres)) {
+        document.title = "SONDE AC-33";
+        affiche("Sonde AC-33 : vecteur incomplet.", "refus", "Il faut au moins k=<clef base64url> et c=<compteur>.");
+        return;
+    }
+
+    const octetsDeClef = base64UrlEnOctets(SONDE.clef);
+    if (octetsDeClef === null || octetsDeClef.length !== TAILLE_CLE) {
+        document.title = "SONDE AC-33";
+        affiche("Sonde AC-33 : clef du vecteur invalide.", "refus", "k doit être une clef de 32 octets en base64url.");
+        return;
+    }
+
+    try {
+        const clef = await importeCle(octetsDeClef);
+        const compteur = BigInt(SONDE.compteur);
+        const valeurDuNonce = nonce(SONDE.sens, compteur);
+        const donnees = donneesAssociees(SONDE.sens, SONDE.route, compteur);
+        const message = await sceller(clef, SONDE.sens, SONDE.route, compteur, SONDE.clair);
+
+        document.title = "SONDE AC-33";
+        affiche(
+            "Sonde AC-33",
+            "attente",
+            "NONCE " + octetsEnHexadecimal(valeurDuNonce) + "\n" +
+            "AAD " + new TextDecoder("utf-8").decode(donnees) + "\n" +
+            "MESSAGE " + octetsEnHexadecimal(message));
+    } catch (echec) {
+        document.title = "SONDE AC-33";
+        affiche("Sonde AC-33 en échec.", "refus", echec && echec.name ? echec.name : String(echec));
+    }
+}
+
+
+// L'ouverture de la page : le fragment, la clef, l'appairage, puis le battement.
+async function demarre() {
+    const parametresDeSonde = estLaSonde();
+    if (parametresDeSonde !== null) {
+        await sondeAc33(parametresDeSonde);
+        return;
+    }
+
+    const fragment = litFragment();
+    if (fragment.erreur === "absent") {
+        affiche(MESSAGE_SANS_FRAGMENT, "refus");
+        return;
+    }
+    if (fragment.erreur === "format") {
+        affiche(MESSAGE_FORMAT, "refus");
+        return;
+    }
+    if (fragment.erreur === "clef") {
+        affiche(MESSAGE_CLE, "refus");
+        return;
+    }
+
+    effaceLeFragment();
+
+    let clef;
+    try {
+        clef = await importeCle(fragment.octetsDeClef);
+    } catch (importRefuse) {
+        affiche(MESSAGE_CLE, "refus");
+        return;
+    }
+
+    // Une adresse IPv6 s'écrit entre crochets dans une URL, une IPv4 sans rien d'autre.
+    const hote = fragment.adresse.indexOf(":") >= 0 ? "[" + fragment.adresse + "]" : fragment.adresse;
+    seance.cle = clef;
+    seance.url = "http://" + hote + ":" + fragment.port;
+    seance.identifiant = tireIdentifiantTelephone();
+
+    window.addEventListener("pagehide", envoieLaFin);   // AC-34 : /fin tente de partir à la fermeture
+
+    affiche("Connexion au PC…", "attente");
+    await battement();
+    if (!seance.arret)
+        seance.minuteur = setInterval(battement, INTERVALLE_BATTEMENT);
+}
+
+demarre().catch(function (imprevu) {
+    affiche("La page n'a pas pu démarrer.", "refus", imprevu && imprevu.name ? imprevu.name : String(imprevu));
+});
+</script>
+</body>
+</html>
