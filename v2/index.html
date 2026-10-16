@@ -2,12 +2,15 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<!-- SCAN-3, fiche §2 « Prise de vue » et AC-1 / AC-11 : la page v2, publiée sous
-     https://tjiriki.github.io/mtg-scan/v2/ (OriginesScan.UrlPage), est la page v1 avec la prise de vue en
-     plus — « mêmes règles que la v1 : mêmes phrases, mêmes chemins, mêmes garde-fous ». Ce qui change est
-     écrit au bloc « PRISE DE VUE » plus bas dans le script : l'aperçu de la caméra arrière, le bouton, le
-     second chemin par sélecteur de fichier, l'encodage JPEG et la route chiffrée /photo. La v1 reste publiée
-     telle quelle sous /v1/, et ne reçoit aucune de ces lignes.
+<!-- SCAN-3, fiche §2 « Prise de vue » et AC-1 / AC-11, repris par l'avenant AV1 §3 (decision de Thomas du
+     2026-10-16 16:18:23) : la page v2, publiée sous https://tjiriki.github.io/mtg-scan/v2/
+     (OriginesScan.UrlPage), est la page v1 avec la prise de vue en plus — « mêmes règles que la v1 : mêmes
+     phrases, mêmes chemins, mêmes garde-fous ». Ce qui change est écrit au bloc « PRISE DE VUE » plus bas dans
+     le script : les DEUX commandes du téléphone — « Prendre une photo » (l'appareil photo arrière) et
+     « Charger des photos » (la galerie, plusieurs à la fois) — le réencodage JPEG de chaque image d'origine et
+     la route chiffrée /photo. L'aperçu en direct et le sélecteur de secours ont été retirés à l'avenant AV1 :
+     la page ne demande plus de flux, elle ne capture plus de trame. La v1 reste publiée telle quelle sous
+     /v1/, et ne reçoit aucune de ces lignes.
      FICHIER UNIQUE : HTML, CSS et script ensemble,
      AUCUNE ressource externe (DIR-SCAN-18) — pas de CDN, pas de police téléchargée, pas d'image. La politique
      de contenu est portée par cette balise <meta> parce que la page est servie par un hébergeur statique sur
@@ -31,30 +34,22 @@
 <style>
 :root { color-scheme: light dark; }
 html { -webkit-text-size-adjust: 100%; }
-/* SCAN-3, décision de Thomas du 2026-10-16 14:43:41 (docs/THOMAS_DECISION_SCAN-3_PageTelephone.md §2), rendue
-   après le R-RUN du téléphone : « le bouton “Prendre la photo” est sous le bas de l'écran du téléphone : il
-   faut faire défiler la page pour l'atteindre ». Tenu en portrait, la page tient donc entière à l'écran, sans
-   barre de défilement — aperçu de la caméra, bouton et message vus ensemble. Trois choses y suffisent : le corps
-   a une hauteur DEFINIE d'écran (height, et non min-height : seule une hauteur définie contraint la chaîne de
-   flexion et laisse l'aperçu se réduire), les espacements et les corps de lettre sont réduits, et l'aperçu de la
-   caméra est la seule pièce élastique : il cède sa hauteur avant les textes, jamais l'inverse. La hauteur est
-   100dvh, l'écran visible barres d'outillage comprises, 100vh restant le repli pour un navigateur qui ne connaît
-   pas l'unité ; overflow: hidden ferme le défilement de la page. Ce que la sonde Edge sans tête du 2026-10-16 a
-   rendu à 412 × 820 (fenêtre interne 725 px), une trame de 720 × 1280 branchée sur l'aperçu et le paragraphe de
-   détail rempli d'une réponse longue — avant la correction : scrollH=852 pour innerH=725, aperçu à camH=406,
-   bouton à btnTop=762 btnBottom=824, btnVisible=false ; après : scrollH=725, defile=false, aperçu réduit à
-   camH=417, bouton à btnTop=660 btnBottom=713, btnVisible=true. Sortie consignée au journal SCAN-3, bloc
-   [2026-10-16 15:00:54-a], docs\mesures\SCAN-3\51_p6_s6_sonde_pair.txt. Ce que la correction ne couvre pas :
-   overflow: hidden ne fait pas défiler, il coupe — une réponse plus longue que la place laissée par l'aperçu
-   serait tronquée, non défilée, et seul le téléphone du R-RUN le dira. Ce qu'elle ne touche pas : le protocole,
-   la politique de contenu, le fragment effacé, le battement et la route /fin sont les mêmes, et aucune phrase
-   n'est raccourcie — les sept phrases d'état de la v1 sont rendues mot pour mot (AC-11), ce sont elles que le
-   test de la page relit une à une. */
+/* SCAN-3, décision de Thomas du 2026-10-16 14:43:41 (docs/THOMAS_DECISION_SCAN-3_PageTelephone.md §2), tenue à
+   l'avenant AV1 (docs/ARCHITECTE_AVENANT_SCAN-3-AV1_PageDeuxBoutons.md §2 et AC-1) : « le bouton “Prendre la
+   photo” est sous le bas de l'écran du téléphone : il faut faire défiler la page pour l'atteindre ». Tenu en
+   portrait, l'écran de prise de vue tient donc entier, les deux commandes comprises. Ce que l'avenant change à
+   la tenue de la page : la pièce élastique qui se réduisait pour garder le bouton à l'écran — l'aperçu de la
+   caméra — n'existe plus, il n'y a donc plus rien à contraindre par une hauteur définie. Le corps reprend sa
+   hauteur par défaut et le paragraphe de détail sa place : la décision du 2026-10-16 14:43:41 §2 rendait le
+   bouton atteignable, l'écart n° 24 du rapport §7.4 lui reprochait de COUPER une réponse longue au lieu de la
+   laisser défiler. Les deux sont réconciliés ici : la page est pleine hauteur, rien ne la borde, et les deux
+   commandes — les deux premières pièces après le titre, chacune de la hauteur d'un pouce — se voient avant
+   qu'aucun texte long n'ait été écrit. Ce que la page ne prouve pas : la hauteur que Brave laisse vraiment sous
+   sa barre d'outillage sur le téléphone de Thomas — c'est AC-1, et AC-1 est au R-RUN. */
 body {
     margin: 0;
-    height: 100vh;
-    height: 100dvh;
-    overflow: hidden;
+    min-height: 100vh;
+    min-height: 100dvh;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -98,13 +93,10 @@ main {
 .connecte { color: #57d38c; }
 .refus { color: #ff8f8f; }
 .attente { color: #f0c674; }
-/* SCAN-3, AC-1 et décision du 2026-10-16 14:43:41 : la prise de vue occupe le bas de l'écran, l'aperçu de la
-   caméra gardant son rapport d'image (object-fit: contain — l'appareil rend ce qu'il voit, la page ne déforme
-   rien). La section et l'aperçu sont les deux seuls morceaux élastiques de la page (flex: 1 1 auto,
-   min-height: 0) : quand une réponse longue monte dans le paragraphe de détail, c'est l'aperçu qui se réduit,
-   jamais le bouton — sa base de flexion est grande, celle des lignes de texte est petite, c'est donc lui qui
-   cède, et le bouton reste au-dessus du bord de l'écran. Rien n'est masqué au clavier : les deux commandes
-   sont de vrais boutons, atteignables au doigt comme au pouce. */
+/* SCAN-3, AC-1 et avenant AV1 §2 / §3 : la prise de vue est une pile de commandes, plus rien qui regarde la
+   caméra. La section n'est élastique que pour pousser le bloc hors du bas de page si le téléphone en rend une
+   plus petite ; rien, dedans, ne se réduit au point de disparaître. Les deux commandes sont de vrais boutons,
+   atteignables au doigt comme au pouce, et restent dans l'ordre du clavier. */
 .prise {
     display: flex;
     flex-direction: column;
@@ -117,16 +109,6 @@ main {
    corps 25 px comme la ligne d'état, soit 36 px comptés dans le défilement du téléphone. Il garde son texte,
    sa place et sa fonction de titre ; il prend le corps du texte courant. */
 #prise h1 { font-size: 17px; }
-#camera {
-    display: block;
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
-    object-fit: contain;
-    background: #000;
-    border-radius: 10px;
-}
-#camera[hidden] { display: none; }
 .bouton {
     display: block;
     flex: 0 0 auto;
@@ -142,30 +124,13 @@ main {
     border-radius: 10px;
 }
 .bouton[disabled] { opacity: 0.55; }
-/* Le déclencheur se masque par son attribut hidden quand la caméra refuse : sans cette ligne, le
-   `display: block` du-dessus l'emporterait sur l'attribut, comme pour le sélecteur en dessous. */
-.bouton[hidden] { display: none; }
-/* Le sélecteur de fichier reste dans le DOM — AC-1 l'exige armé « capture="environment" » — et n'apparaît que
-   quand la caméra refuse : c'est le second chemin d'AC-1, « sinon le sélecteur de fichier s'ouvre ». Il est
-   masqué par son attribut hidden, comme la section et l'aperçu au-dessus, et basculeSurLeSelecteur retire cet
-   attribut — il ne pourrait pas si une règle d'auteur le maintenait en `display: none`, ce qui l'emporte sur le
-   retrait de l'attribut : c'est le défaut levé par docs/THOMAS_DECISION_SCAN-3_SecoursEtMesure19.md (constat §1,
-   décision §2, 2026-10-16). Visible, il prend la figure du bouton et la place que la même bascule rend, donc la
-   page n'a toujours rien à défiler (décision du 2026-10-16 14:43:41, §2, tenue). */
-#fichier[hidden] { display: none; }
-#fichier {
-    display: block;
-    flex: 0 0 auto;
-    width: 100%;
-    margin: 10px 0 0;
-    padding: 14px 18px;
-    font: inherit;
-    font-size: 19px;
-    font-weight: 600;
-    color: #10131a;
-    background: #e7eaf0;
-    border: 0;
-    border-radius: 10px;
+/* Les deux champs de sélection ne se voient pas : ce sont les deux boutons ci-dessus qui les ouvrent, l'un sur
+   l'appareil photo arrière du téléphone (l'attribut capture est posé sur le champ), l'autre sur la galerie
+   avec plusieurs images à la fois (l'attribut multiple, et aucun capture). Un champ fichier caché par le style
+   reste atteignable au script : c'est le geste du doigt sur le bouton qui lui ouvre la porte du téléphone, et
+   c'est ce geste-là que le navigateur accepte. */
+.champ {
+    display: none;
 }
 </style>
 </head>
@@ -173,19 +138,25 @@ main {
 <main>
     <p class="marque">MTG Manager</p>
     <p id="etat" class="etat" role="status" aria-live="polite">Ouverture…</p>
-    <p id="detail" class="detail"></p>
-    <!-- SCAN-3, AC-1 et AC-11 : la prise de vue n'apparaît qu'une fois la session ouverte — avant
-         l'appairage il n'y a aucune clef, donc rien à chiffrer. « Scanne la carte » est le titre que la fiche
-         impose à AC-11 ; au-dessus, l'état et le détail gardent mot pour mot les phrases de la v1. -->
+    <p id="detail" class="detail" role="status" aria-live="polite"></p>
+    <!-- SCAN-3, AC-1 et AC-11, repris par l'avenant AV1 §2 : la prise de vue n'apparaît qu'une fois la session
+         ouverte — avant l'appairage il n'y a aucune clef, donc rien à chiffrer. « Scanne la carte » est le titre
+         que la fiche impose à AC-11 ; au-dessus, l'état et le détail gardent mot pour mot les phrases de la v1.
+         Les DEUX commandes sont vues dès que cette section paraît, sans rien faire défiler (AC-1) : elles
+         remplacent l'aperçu de la caméra et le sélecteur de secours, tous deux retirés. -->
     <section id="prise" class="prise" hidden>
         <h1 class="etat">Scanne la carte</h1>
-        <video id="camera" autoplay playsinline muted></video>
         <canvas id="toile" width="0" height="0" hidden></canvas>
-        <button id="declencheur" class="bouton" type="button">Prendre la photo</button>
-        <!-- AC-1, second chemin : « sinon le sélecteur de fichier s'ouvre ». capture="environment" est ce qui
-             demande l'appareil photo plutôt que la galerie ; l'élément arrive masqué par son attribut hidden,
-             que basculeSurLeSelecteur retire quand la caméra refuse — c'est alors lui que le doigt atteint. -->
-        <input id="fichier" type="file" accept="image/*" capture="environment" hidden>
+        <!-- AC-1, premier chemin : « Prendre une photo » (ouvre l'appareil photo arrière du téléphone). -->
+        <button id="prendre" class="bouton" type="button">Prendre une photo</button>
+        <!-- AC-15, second chemin : « Charger des photos » (ouvre la galerie, plusieurs photos à la fois). -->
+        <button id="charger" class="bouton" type="button">Charger des photos</button>
+        <!-- Les deux champs que les boutons ouvrent, et personne d'autre : #appareil porte capture="environment"
+             — c'est ce qui demande l'objectif du dos en pleine résolution —, #galerie porte multiple et aucun
+             capture, ce qui laisse le téléphone montrer sa galerie. La toile cache le canvas : elle ne sert
+             qu'au réencodage de l'image, jamais elle ne se montre (AC-16). -->
+        <input id="appareil" class="champ" type="file" accept="image/*" capture="environment">
+        <input id="galerie" class="champ" type="file" accept="image/*" multiple>
     </section>
     <noscript class="detail">Cette page a besoin de JavaScript pour chiffrer ses échanges avec le PC.</noscript>
 </main>
@@ -255,6 +226,18 @@ const MESSAGE_TRANSPORT = "Le PC ne répond pas. Vérifie qu'il est allumé, que
 const MESSAGE_RECONNUE = "Reconnue : ";        // + « <nom> (<CODE> #<n°>) », bâti par renduDeLaPhoto
 const MESSAGE_A_CHOISIR = "À choisir sur le PC";
 const MESSAGE_NON_RECONNUE = "Carte non reconnue — réessayez avec plus de lumière";
+
+// AVENANT AV1 (AC-1 et AC-15) : les phrases que les DEUX commandes doivent rendre. L'avenant ne les impose pas
+// mot pour mot — seule la ligne « Scanne la carte » de la fiche est citée — mais elles disent quoi faire,
+// jamais un détail technique. Les deux portant un nombre en fin de ligne : AC-15 veut que la page « s'arrête et
+// dise combien de photos restent à renvoyer », et la série ne se reprend pas toute seule — c'est au doigt de
+// retoucher « Charger des photos ».
+const MESSAGE_SERIE_EN_COURS = "Une série de photos est déjà en cours d'envoi.";
+const MESSAGE_SERIE_INTERROMPU = "Photos restantes à renvoyer après la minute : ";
+const MESSAGE_SERIE_COUPEE = "Photos restantes à renvoyer après un nouvel appairage : ";
+// Le téléphone n'a pas rendu une image que sa propre appli sait lire : la photo n'est jamais partie, et ce
+// n'est pas un refus du PC. La série passe à la suivante.
+const MESSAGE_ENCODE_IMPOSSIBLE = "Le téléphone n'a pas pu lire cette image.";
 
 // Les refus que le PC sait dire (TraitementPhoto.Motif*, rendus par PagesScan.RefusPhotoEnJson) : la fiche
 // §2, point 6, veut « une réponse chiffrée qui dit pourquoi, sans détail technique ». Ces phrases ne sont pas
@@ -393,13 +376,15 @@ function tireIdentifiantTelephone() {
 const champEtat = document.getElementById("etat");
 const champDetail = document.getElementById("detail");
 
-// SCAN-3, AC-1 : les cinq pièces de la prise de vue, prises une fois pour toutes comme les deux
-// paragraphes d'état ci-dessus. La section reste cachée tant que la session n'est pas ouverte.
+// SCAN-3 et avenant AV1 §3, AC-1 / AC-15 : les pièces de la prise de vue, prises une fois pour toutes comme
+// les deux paragraphes d'état ci-dessus. La section reste cachée tant que la session n'est pas ouverte ; les
+// deux champs de sélection ne se montrent jamais, ce sont les deux boutons qui les ouvrent.
 const sectionPrise = document.getElementById("prise");
-const champCamera = document.getElementById("camera");
 const toile = document.getElementById("toile");
-const boutonDeclencheur = document.getElementById("declencheur");
-const selecteurFichier = document.getElementById("fichier");
+const boutonPrendre = document.getElementById("prendre");
+const boutonCharger = document.getElementById("charger");
+const champAppareil = document.getElementById("appareil");
+const champGalerie = document.getElementById("galerie");
 
 // Toute la mémoire de la page. Rien n'y est écrit dans un stockage du navigateur : fermer l'onglet tue la
 // clef, l'identifiant et les compteurs (DIR-SCAN-5 v2, AC-28).
@@ -414,13 +399,22 @@ const seance = {
     arret: false,
     minuteur: null,
     messageDeFin: null,              // le message /fin scellé d'avance, prêt à partir en keepalive
-    finEnvoyee: false
+    finEnvoyee: false,
+    contexteDeLaPhoto: ""            // AC-15 : « Photo k sur n » pendant une série, vide pour une seule photo
 };
 
+// L'état de la page, en deux lignes : la phrase courte et son détail. AC-15 (avenant AV1 §3) ajoute la
+// progression de la série : tant qu'une file de photos part, le contexte porte « Photo k sur n » et se rappelle
+// à chaque phrase, y compris aux réponses du PC — « la page affiche la progression (photo k sur n) et la
+// réponse de chacune ». Hors série, le contexte est vide et la ligne se lit comme sous la v1.
 function affiche(texte, classe, detail) {
     champEtat.textContent = texte;
     champEtat.className = "etat" + (classe ? " " + classe : "");
-    champDetail.textContent = detail || "";
+
+    const reste = detail || "";
+    champDetail.textContent = seance.contexteDeLaPhoto === ""
+        ? reste
+        : (reste === "" ? seance.contexteDeLaPhoto : seance.contexteDeLaPhoto + " — " + reste);
 }
 
 // Le compteur du téléphone est unique pour les trois routes — le PC n'en tient qu'un par sens
@@ -559,7 +553,9 @@ function envoieLaFin() {
 }
 
 // Couper le battement et oublier le message de fin : après un refus, la clef n'est plus la bonne, il n'y a
-// plus rien à fermer proprement.
+// plus rien à fermer proprement. Ce que la page n'a plus à relâcher (avenant AV1 §3) : elle ne tient plus de
+// flux de caméra — c'est l'application photo du téléphone qui ouvre et referme son objectif, et rien ici ne
+// reste ouvert après la session (DIR-SCAN-5 v2).
 function arrete() {
     seance.arret = true;
     if (seance.minuteur !== null) {
@@ -567,9 +563,6 @@ function arrete() {
         seance.minuteur = null;
     }
     seance.messageDeFin = null;
-    // SCAN-3 : la session est close, la caméra n'a plus rien à garder ouvert. La relâcher ici est le seul
-    // geste qui éteigne le témoin de l'appareil photo — DIR-SCAN-5 v2 veut que rien ne survive à la session.
-    relacheLaCamera();
 }
 
 // Un battement : /etat, dont la réponse chiffrée porte l'état de la session (AC-34, AC-36).
@@ -767,128 +760,134 @@ async function sondeAc33(parametres) {
 }
 
 
-// ————— la prise de vue (SCAN-3, fiche §2 « Prise de vue », AC-1 et AC-11) —————
+// ————— la prise de vue (SCAN-3, fiche §2 « Prise de vue » ; avenant AV1 §3, AC-1, AC-15, AC-16) —————
 //
-// Ce qui distingue la v2 de la v1 tient en trois phrases : le téléphone prend la photo lui-même (caméra
-// arrière), il l'encode en JPEG avant l'envoi, et il l'envoie à la route chiffrée /photo, dont la réponse dit
-// ce que le PC a reconnu. Les règles de la v1 restent telles quelles : fragment lu puis effacé, clef non
-// extractible et jamais écrite dans un stockage du navigateur, un seul échange à la fois (seance.enVol),
-// aucune ressource externe, aucun corps texte lisible.
+// Ce qui distingue la v2 de la v1 tient en trois phrases, écrites par l'avenant AV1 : le téléphone prend la
+// photo avec son propre appareil photo, ou la choisit dans sa galerie plusieurs à la fois ; chaque image est
+// réencodée en JPEG à partir de l'original qu'il vient de rendre ; et elle part à la route chiffrée /photo,
+// dont la réponse dit ce que le PC a reconnu. Les règles de la v1 restent telles quelles : fragment lu puis
+// effacé, clef non extractible et jamais écrite dans un stockage du navigateur, un seul échange à la fois
+// (seance.enVol), aucune ressource externe, aucun corps texte lisible.
 //
-// Ce que ce bloc ne prouve pas : le flux affiché sur un vrai téléphone, et le refus de la caméra en https.
-// AC-1 et AC-11 sont au R-RUN de la fiche §7, pas à un test unitaire. Ce qu'il y aura lieu d'y regarder en
-// premier : qu'un MediaStream passe par srcObject — donc par aucun chargeur de ressource, et ni media-src ni
-// img-src de la politique <meta> ne le regardent.
+// Ce qui est retiré à l'avenant AV1 §3, ligne 45 — le code de l'aperçu en direct, l'API de flux et la trame
+// vidéo — et pourquoi, écrit au constat §1 du même avenant : la page demandait la caméra sans résolution et
+// capturait la trame à la taille du flux, donc envoyait une image trop petite pour lire la ligne du bas. Douze
+// photos prises par l'aperçu n'ont rendu aucune « Exacte » ; une photo prise par l'appareil photo du téléphone
+// a fait lire l'édition et le numéro pour la première fois. La page ne demande donc plus aucun flux, ne rend
+// plus d'aperçu, ne dessine plus de trame et ne garde rien à relâcher : les trois mots-clés d'API qui le
+// prouvaient sont d'ailleurs vérifiés absents de ce fichier par le test de la page.
+//
+// Ce que ce bloc ne prouve pas : qu'un téléphone ouvre bien l'objectif du dos sur « Prendre une photo », qu'il
+// ouvre la galerie avec plusieurs images sur « Charger des photos », et la hauteur réelle que le navigateur
+// laisse à l'écran en portrait. AC-1, AC-15 et AC-16 sont au R-RUN (avenant §4 point 5), pas à un test
+// unitaire — A1-17 : le test de la page est un test de câblage.
 
 const COTE_ENVOYE = 4032;        // fiche §2, ligne « Réencodage » : « La page réencode en JPEG, grand côté
                                  // ≤ 4 032 px (DIR-SCAN-7), puis chiffre selon le protocole AV3 (…) et envoie
-                                 // sur une nouvelle route POST /photo. » La page prend le plafond tel quel : le
-                                 // PC, lui, juge les dimensions dans l'en-tête (ContrôlePhoto, refus au-delà de
-                                 // 8 000 × 8 000) — la page n'a rien d'autre à juger.
+                                 // sur une nouvelle route POST /photo. » AC-16 de l'avenant reprend le même
+                                 // plafond et y ajoute la provenance : « à partir de l'image d'origine du
+                                 // téléphone, jamais d'une image plus petite ». Le facteur ne fait donc que
+                                 // réduire — une image déjà sous le plafond part à sa taille. Le PC, lui, juge
+                                 // les dimensions dans l'en-tête (ContrôlePhoto, refus au-delà de 8 000 × 8 000).
 const QUALITE_JPEG = 0.85;       // choix du DEV, pas une citation de la fiche : la fiche §2 dit « réencode en
                                  // JPEG » et ne nomme aucun taux. 0,85 vise un fichier qui reste sous les 15 Mo
                                  // du message chiffré sans jeter de détail sur la carte ; ce qu'un téléphone
                                  // donné rend vraiment se juge au R-RUN (fiche §7).
 
-let fluxCamera = null;           // le MediaStream ouvert, pour le relâcher quand la session meurt
+// AC-15 : « Les photos choisies partent une par une, chacune après la réponse de la précédente. » Ce que la
+// série tient en mémoire : les fichiers restants, et les deux chiffres qu'elle affiche. Rien n'y survit à la
+// page (DIR-SCAN-5 v2), et un seul tour de file à la fois (AC-6 côté PC). La raison d'un arrêt, elle, ne tient
+// pas ici : c'est la boucle qui la connaît, et elle s'éteint avec elle.
+const serie = {
+    fichiers: [],                  // la file des fichiers restants, dans l'ordre du téléphone
+    total: 0,                      // le n de « photo k sur n », figé au premier tour
+    envoyees: 0,                   // le k de « photo k sur n »
+    enCours: false                 // une série occupe-t-elle la session ?
+};
 
-// La caméra rendue muette et libre. C'est le seul geste qui éteigne son témoin : garder le flux ouvert après
-// un /fin ou un 401 laisserait l'objectif allumé sur une session close (DIR-SCAN-5 v2 : rien ne lui
-// survit). Aucun flux ouvert, rien à faire.
-function relacheLaCamera() {
-    if (fluxCamera === null)
-        return;
+// Ce qu'un envoi rend à la série : la suivante mérite sa chance, ou la série s'arrête. Le seul refus du PC qui
+// oblige à s'arrêter est « minute » — soixante envois sont déjà partis dans la minute, le tour d'après les
+// acceptera (AC-7 côté PC). Tout ce qui ferme la session arrête pareil : il n'y a plus de clef pour chiffrer.
+const APRES_CONTINUE = "continue";
+const APRES_ARRET = "arret";
 
-    const flux = fluxCamera;
-    fluxCamera = null;
-    for (const morceau of flux.getTracks())
-        morceau.stop();
-
-    champCamera.srcObject = null;
+// Un champ de sélection rendu vide. Sans ce geste, retoucher le bouton sur la même photo ne rendrait aucun
+// événement change — la valeur n'aurait pas bougé — et la photo ne partirait pas deux fois par inadvertance.
+function videLeChamp(champ) {
+    champ.value = "";
 }
 
-// AC-1 : « le flux de la caméra arrière en direct ». facingMode: "environment" demande l'objectif du dos ;
-// { ideal: … } laisse le téléphone rendre autre chose plutôt que refaire un refus — un téléphone sans
-// caméra arrière n'a pas à tomber sur le second chemin, c'est encore le même écran.
-async function ouvreLaCamera() {
-    const flux = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false
-    });
+// Une seule file à la fois (AC-15, et AC-6 côté PC qui ne laisse qu'une photo en cours d'examen).
+function serieEnCours() {
+    if (!serie.enCours)
+        return false;
 
-    fluxCamera = flux;
-    champCamera.srcObject = flux;
-    champCamera.hidden = false;
-    boutonDeclencheur.hidden = false;
+    affiche(MESSAGE_SERIE_EN_COURS, "attente", "Attends la réponse de la dernière, puis retouche le bouton.");
+    return true;
+}
 
-    // play() peut refuser sans geste de l'utilisateur — politique d'autoplay du navigateur. Le flux est
-    // ouvert malgré tout et le bouton répond sur la trame en cours : l'aperçu n'est pas la photo.
+// AC-1, premier chemin : « “Prendre une photo” (ouvre l'appareil photo arrière) ». La page ne se montre rien
+// elle-même : c'est l'application photo du téléphone qui cadre, qui déclenche, et qui rend sa photo en pleine
+// résolution — l'attribut capture="environment" du champ #appareil est ce qui demande l'objectif du dos. Le
+// clic synthétique se tient dans le geste du doigt qui l'a demandé : hors d'un geste de l'utilisateur, aucun
+// navigateur n'ouvre ce sélecteur-là. Une prise annulée ne rend aucun événement change : rien ne part (AC-1).
+function ouvreLeSelecteurDePrise() {
+    if (serieEnCours())
+        return;
+    champAppareil.click();
+}
+
+// AC-15 : « “Charger des photos” ouvre la galerie avec sélection multiple. » Le champ #galerie ne porte aucun
+// capture et porte multiple : c'est ce qui laisse le téléphone montrer sa galerie et en choisir plusieurs.
+function ouvreLaGalerie() {
+    if (serieEnCours())
+        return;
+    champGalerie.click();
+}
+
+// ————— AC-16 (avenant AV1 §3) : le réencodage part de l'image d'origine du téléphone —————
+//
+// « Chaque photo, prise ou chargée, est réencodée en JPEG à grand côté ≤ 4 032 px à partir de l'image d'origine
+// du téléphone, jamais d'une image plus petite. » createImageBitmap lit le fichier que le téléphone vient de
+// rendre : c'est le seul chemin par lequel la pleine résolution de l'objectif arrive au PC — la trame d'un
+// aperçu, elle, arrivait à la taille du flux, et c'est le constat §1 de l'avenant. Le facteur ne fait que
+// réduire (Math.min(1, …)) : une image déjà sous le plafond part à sa taille, l'agrandir n'ajouterait aucun
+// détail de carte. Aucune URL d'objet n'est créée — la bitmap vient du fichier, il n'y a aucun chargement que
+// la politique « img-src 'none' » aurait à regarder, et rien n'écrit sur le téléphone (DIR-SCAN-8).
+async function jpegDuFichier(fichier) {
+    let image = null;
     try {
-        await champCamera.play();
-    } catch (lectureRefusee) {
-        // Rien à l'écran : ce que Thomas juge ici, c'est la photo que le bouton envoie (AC-1, R-RUN).
+        image = await createImageBitmap(fichier, { imageOrientation: "from-image" });
+
+        const largeur = image.width;
+        const hauteur = image.height;
+        if (largeur === 0 || hauteur === 0)
+            return null;
+
+        const facteur = Math.min(1, COTE_ENVOYE / Math.max(largeur, hauteur));
+        const cible = Math.max(1, Math.round(largeur * facteur));
+        const cibleHauteur = Math.max(1, Math.round(hauteur * facteur));
+
+        toile.width = cible;
+        toile.height = cibleHauteur;
+        toile.getContext("2d").drawImage(image, 0, 0, cible, cibleHauteur);
+
+        return await octetsDeLaToile();
+    } catch (imageIllisible) {
+        // Le téléphone rend un format que son propre décodeur ne sait pas lire ici, ou la mémoire a été
+        // refusée : la photo ne part pas, et ce n'est pas un refus du PC. Le nom de l'exception ne se montre
+        // pas — il ne dit à personne quoi faire (fiche §2, ligne « Réponse au téléphone »).
+        return null;
+    } finally {
+        if (image !== null)
+            image.close();     // une bitmap de 4 032 px pèse sa place ; la série peut en rendre dix
     }
-}
-
-// Le refus de la caméra, dit en français. Le nom de l'exception ne se montre pas : il ne dit à personne quoi
-// faire, et la fiche veut une phrase qui dit quoi faire, pas un détail technique.
-function raisonDeLaCamera(echec) {
-    const nom = echec && echec.name ? echec.name : "";
-    if (nom === "NotAllowedError" || nom === "SecurityError")
-        return "L'accès à la caméra a été refusé sur ce téléphone.";
-    if (nom === "NotFoundError" || nom === "NotReadableError" || nom === "OverconstrainedError")
-        return "Ce téléphone ne propose pas de caméra utilisable.";
-    return "La caméra n'a pas répondu.";
-}
-
-// AC-1, second chemin : « sinon le sélecteur de fichier s'ouvre ». Ce que la page fait ici est littéral : elle
-// rend le sélecteur visible et touchable en levant son attribut hidden — elle ne clique pas à la place de
-// l'utilisateur, ce qu'aucun navigateur ne laisse faire hors d'un geste de lui. L'aperçu et le déclencheur se
-// masquent par le même attribut (règles #camera[hidden] et .bouton[hidden] de la feuille de style), si bien que
-// le secours prend la place rendue et que la page ne se met pas à défiler.
-function basculeSurLeSelecteur(raison) {
-    relacheLaCamera();
-    champCamera.hidden = true;
-    boutonDeclencheur.hidden = true;
-    selecteurFichier.hidden = false;
-    affiche("La caméra ne s'ouvre pas.", "attente", raison + " Choisis une photo, ou autorise la caméra puis reviens ici.");
-}
-
-// La photo demandée au bouton : la trame en cours de l'aperçu, réduite, encodée, envoyée. La fiche §2, ligne
-// « Réencodage », ne dit qu'une taille : « La page réencode en JPEG, grand côté ≤ 4 032 px (DIR-SCAN-7) » —
-// COTE_ENVOYE prend ce plafond tel quel. Le taux de 0,85 est un choix du DEV (voir sa constante), la fiche n'en
-// nomme aucun. Le ratio est gardé — l'écart entre les deux côtés d'une photo de carte n'est pas une raison pour
-// l'étirer.
-async function prendsLaPhoto() {
-    const largeur = champCamera.videoWidth;
-    const hauteur = champCamera.videoHeight;
-    if (largeur === 0 || hauteur === 0) {
-        // Rien à encoder : l'aperçu n'a pas encore de trame. Le geste est dit, aucun message ne part.
-        affiche("L'aperçu de la caméra n'est pas prêt.", "attente", "Attends une seconde, puis retouche le bouton.");
-        return;
-    }
-
-    const facteur = Math.min(1, COTE_ENVOYE / Math.max(largeur, hauteur));
-    const cible = Math.max(1, Math.round(largeur * facteur));
-    const cibleHauteur = Math.max(1, Math.round(hauteur * facteur));
-
-    toile.width = cible;
-    toile.height = cibleHauteur;
-    toile.getContext("2d").drawImage(champCamera, 0, 0, cible, cibleHauteur);
-
-    const octets = await octetsDeLaToile();
-    if (octets === null) {
-        // toBlob rend null quand il n'a rien à rendre (toile vide, mémoire refusée) : rien n'est envoyé.
-        affiche("Le téléphone n'a pas pu encoder la photo.", "refus", "Retouche le bouton, ou choisis une photo.");
-        return;
-    }
-
-    await envoieLaPhoto(octets);
 }
 
 // Le JPEG de la toile, en octets. toBlob est asynchrone et ne rend rien : cette promesse est le seul moyen
 // d'attendre l'encodage avant de tirer le compteur — deux messages en porte-à-faux se marcheraient sur le
-// compteur unique que le PC tient par sens (AC-30).
+// compteur unique que le PC tient par sens (AC-30). toBlob rend null quand il n'a rien à rendre (toile vide,
+// mémoire refusée) ; l'appelante traite ce null comme une image illisible.
 function octetsDeLaToile() {
     return new Promise(function (resolve) {
         toile.toBlob(async function (image) {
@@ -897,32 +896,133 @@ function octetsDeLaToile() {
     });
 }
 
-// AC-1, second chemin : le fichier choisi arrive tel que le téléphone l'a fait (JPEG ou PNG selon l'appli
-// photo). La page ne le retouche pas — les deux contrôles du PC, signature et cadre (AC-4, AC-5), le jugent
-// tel quel. La valeur du champ se vide après l'envoi : retenter la même photo doit rejouer l'événement.
-async function envoieLeFichierChoisi(fichier) {
-    if (fichier === null || typeof fichier === "undefined")
+// Le téléphone n'a pas rendu une image que son propre décodeur sait lire : la photo n'est jamais partie, et le
+// PC n'y est pour rien. La série, elle, passe à la suivante.
+function leTelephoneNaPasLu() {
+    affiche(MESSAGE_ENCODE_IMPOSSIBLE, "refus", "Choisis un JPEG ou un PNG, ou reprends la carte en photo.");
+}
+
+// « la page affiche la progression (photo k sur n) » (AC-15). Une photo seule — la prise d'un coup par
+// l'appareil photo, ou un seul choix dans la galerie — n'a rien à compter : le contexte reste vide et la ligne
+// d'état se lit comme sous la v1.
+function progressionDeLaPhoto() {
+    return serie.total > 1 ? "Photo " + serie.envoyees + " sur " + serie.total : "";
+}
+
+// Les fichiers que le téléphone a rendus, en tableau bien à nous : la liste vivante du champ se vide derrière
+// nous (ci-dessous), et un objet de DOM ne se garde pas entre deux gestes.
+function enAttente(champ) {
+    return (champ.files && champ.files.length) ? Array.prototype.slice.call(champ.files) : [];
+}
+
+// AC-1, premier chemin, la suite du geste : la prise validée par l'application photo est réencodée depuis
+// l'original qu'elle vient de rendre (AC-16), puis envoyée. Une prise annulée ne rend aucun événement change :
+// cette fonction n'est pas appelée, et rien ne part.
+async function unePhotoDuTelephone(fichier) {
+    const octets = await jpegDuFichier(fichier);
+    if (octets === null) {
+        leTelephoneNaPasLu();
+        return;
+    }
+
+    await envoieLaPhoto(octets);
+}
+
+// AC-15 : « Les photos choisies partent une par une, chacune après la réponse de la précédente. » Toute la file
+// se prend avant le premier envoi — le « sur n » affiché ne bouge donc pas en route — et le champ se vide tout
+// de suite : ce sont ces objets que la série tient, plus la valeur du téléphone. La boucle est séquentielle :
+// un seul envoi à la fois (seance.enVol), un seul compteur par sens (AC-30), un seul tour de file côté PC (AC-6).
+async function chargeLaGalerie(fichiers) {
+    const choisis = fichiers.slice();
+    if (choisis.length === 0)
         return;
 
-    await envoieLaPhoto(new Uint8Array(await fichier.arrayBuffer()));
-    selecteurFichier.value = "";
+    serie.fichiers = choisis;
+    serie.total = choisis.length;
+    serie.envoyees = 0;
+    await videLaSerie();
+}
+
+// AC-15, fin du chemin : « Sur un refus “minute”, la page s'arrête et dit combien de photos restent à
+// renvoyer. » La série ne se reprend pas toute seule — la page ne tient pas d'horloge en attente de la minute
+// du PC — mais le compte est dit, et le nom du bouton à retoucher. Quand ce n'est plus la minute qu'il faut
+// attendre mais un nouveau code d'appairage, la phrase le dit aussi : la clef n'est plus la bonne.
+function finDeLaSerie(reste, sessionClosee) {
+    if (sessionClosee) {
+        affiche(MESSAGE_SERIE_COUPEE + reste, "refus");
+        return;
+    }
+
+    affiche(MESSAGE_SERIE_INTERROMPU + reste, "attente");
+}
+
+// La boucle de la série. Elle s'arrête sur le refus « minute » du PC (AC-15) et sur tout ce qui ferme la
+// session ; ailleurs elle passe à la suivante, y compris quand le PC n'a pas reconnu la carte ou n'a pas pu la
+// lire — les cartes d'après méritent leur chance. Ce qu'elle ne fait pas : reprendre toute seule plus tard, ni
+// envoyer deux photos dans le même tour de file (AC-6).
+async function videLaSerie() {
+    serie.enCours = true;
+    boutonCharger.disabled = true;
+    boutonPrendre.disabled = true;
+
+    let arretSurLaSession = false;
+    while (serie.fichiers.length > 0) {
+        const fichier = serie.fichiers.shift();
+        serie.envoyees += 1;
+        seance.contexteDeLaPhoto = progressionDeLaPhoto();
+
+        const octets = await jpegDuFichier(fichier);
+        if (octets === null) {
+            leTelephoneNaPasLu();
+            if (seance.arret) {
+                arretSurLaSession = true;
+                break;
+            }
+            continue;
+        }
+
+        if (await envoieLaPhoto(octets) === APRES_ARRET) {
+            arretSurLaSession = seance.arret;
+            break;
+        }
+    }
+
+    const reste = serie.fichiers.length;
+    serie.fichiers = [];
+    serie.envoyees = 0;
+    serie.total = 0;
+    serie.enCours = false;
+    seance.contexteDeLaPhoto = "";
+    if (!seance.arret) {
+        boutonCharger.disabled = false;
+        boutonPrendre.disabled = false;
+    }
+
+    if (reste > 0)
+        finDeLaSerie(reste, arretSurLaSession);
 }
 
 // Une photo au PC : scellée pour /photo, un seul échange à la fois. Le verrou est celui du battement
 // (seance.enVol), et le PC en tient la raison : un seul compteur par sens (AC-30), et AC-6 ne laisse qu'une
 // photo en cours. Un battement qui survient pendant l'envoi passe son tour, comme sous la v1.
+//
+// AC-15 ajoute ce que la fonction REND à la série : APRES_CONTINUE quand la photo n'a pas été reconnue, quand
+// le PC l'a refusée pour sa forme ou sa taille, et quand le transport a manqué — la carte d'après mérite sa
+// chance ; APRES_ARRET quand le PC répond « minute » (il a déjà compté soixante envois, AC-7) et quand la
+// session vient de se fermer, faute de clef valide ou d'origine admise.
 async function envoieLaPhoto(octets) {
     if (seance.arret) {
         affiche(ETATS.deconnecte, "refus");
-        return;
+        return APRES_ARRET;
     }
     if (seance.enVol) {
         affiche("Le PC est déjà en train de recevoir quelque chose.", "attente", "Attends une seconde, puis retente.");
-        return;
+        return APRES_ARRET;
     }
 
     seance.enVol = true;
-    boutonDeclencheur.disabled = true;
+    boutonPrendre.disabled = true;
+    boutonCharger.disabled = true;
     affiche("Envoi de la photo au PC…", "attente");
     try {
         const message = await sceller(seance.cle, SENS_TELEPHONE, ROUTE_PHOTO, emetsCompteur(), octets);
@@ -931,37 +1031,56 @@ async function envoieLaPhoto(octets) {
         if (reponse.status === 413) {
             // Le seul refus qui ne soit pas chiffré : la taille du message est jugée avant lecture.
             affiche(MESSAGE_IMAGE_TROP_GROSSE, "refus");
-        } else if (reponse.status === 403) {
+            return APRES_CONTINUE;
+        }
+        if (reponse.status === 403) {
             affiche(MESSAGE_HORS_ORIGIN, "refus");
             arrete();
-        } else if (reponse.status === 401) {
+            return APRES_ARRET;
+        }
+        if (reponse.status === 401) {
             // AC-30 : la clef du QR n'est plus celle du PC. La photo n'y est pour rien.
             affiche(MESSAGE_REFUS, "refus");
             arrete();
-        } else if (!reponse.ok) {
-            affiche(MESSAGE_TRANSPORT, "attente");
-        } else {
-            const clair = await ouvreReponse(ROUTE_PHOTO, new Uint8Array(await reponse.arrayBuffer()));
-            if (clair === null) {
-                // Une réponse dont l'étiquette ne suit pas ne vient pas du PC : on ne la lit pas (AC-29).
-                affiche(MESSAGE_REFUS, "refus");
-                arrete();
-            } else {
-                renduDeLaPhoto(clair);
-            }
+            return APRES_ARRET;
         }
+        if (!reponse.ok) {
+            affiche(MESSAGE_TRANSPORT, "attente");
+            return APRES_CONTINUE;
+        }
+
+        const clair = await ouvreReponse(ROUTE_PHOTO, new Uint8Array(await reponse.arrayBuffer()));
+        if (clair === null) {
+            // Une réponse dont l'étiquette ne suit pas ne vient pas du PC : on ne la lit pas (AC-29).
+            affiche(MESSAGE_REFUS, "refus");
+            arrete();
+            return APRES_ARRET;
+        }
+
+        const rendu = renduDeLaPhoto(clair);
+        return (seance.arret || rendu === APRES_ARRET) ? APRES_ARRET : APRES_CONTINUE;
     } catch (photoSansReponse) {
         affiche(MESSAGE_TRANSPORT, "attente");
+        return APRES_CONTINUE;
     } finally {
         seance.enVol = false;
-        if (!seance.arret)
-            boutonDeclencheur.disabled = false;
+        // Pendant une série, c'est la boucle qui rend les deux commandes en fin de file — pas le premier
+        // tour venu. Une session close ne les rend pas : il n'y a plus rien à envoyer.
+        if (!seance.arret && !serie.enCours) {
+            boutonPrendre.disabled = false;
+            boutonCharger.disabled = false;
+        }
     }
 }
 
 // CE QUE LE PC A RECONNU (fiche §2, ligne « Réponse au téléphone »). Les mots-clefs du protocole
 // (« exacte », « a_choisir », « non_reconnue » — PagesScan.NiveauSurLeFil) ne se montrent jamais : ici, des
 // phrases en français. Un niveau que cette page ne connaît pas se dit, il ne se peint pas en vert.
+//
+// AC-15 (avenant AV1 §3) ajoute ce que la fonction REND à la série de la galerie : le seul motif de refus qui
+// l'oblige à s'arrêter est « minute » — le PC a déjà compté soixante envois dans la minute (AC-7) et les
+// suivants partiront au tour d'après. Une carte non reconnue, un format refusé, une image trop grande pour le
+// PC : la photo d'après mérite sa chance.
 function renduDeLaPhoto(clair) {
     let recu;
     try {
@@ -972,8 +1091,11 @@ function renduDeLaPhoto(clair) {
 
     if (recu === null || typeof recu !== "object") {
         affiche(MESSAGE_REFUS, "refus");
-        return;
+        return APRES_CONTINUE;
     }
+
+    if (typeof recu.refus === "string" && recu.refus === "minute")
+        return APRES_ARRET;
 
     if (typeof recu.refus === "string") {
         affiche(
@@ -981,7 +1103,7 @@ function renduDeLaPhoto(clair) {
                 ? MOTIFS_DE_REFUS[recu.refus]
                 : MESSAGE_REFUS_INCONNU,
             "refus");
-        return;
+        return APRES_CONTINUE;
     }
 
     const nom = typeof recu.nom === "string" ? recu.nom : "";
@@ -993,7 +1115,7 @@ function renduDeLaPhoto(clair) {
             ? " (" + recu.extension + (typeof recu.numero === "string" ? " #" + recu.numero : "") + ")"
             : "";
         affiche(MESSAGE_RECONNUE + nom + code, "connecte");
-        return;
+        return APRES_CONTINUE;
     }
 
     if (recu.niveau === "a_choisir") {
@@ -1003,37 +1125,52 @@ function renduDeLaPhoto(clair) {
         // dit au rapport du lot, pas comblé par un champ ajouté au protocole d'AC-2 sans personne.
         affiche(MESSAGE_A_CHOISIR, "attente",
             (nom === "" ? "" : nom + " — ") + "choisis l'impression sur l'écran du PC.");
-        return;
+        return APRES_CONTINUE;
     }
 
     if (recu.niveau === "non_reconnue") {
         affiche(MESSAGE_NON_RECONNUE, "refus");
-        return;
+        return APRES_CONTINUE;
     }
 
     affiche("Le PC a répondu un niveau que cette page ne connaît pas.", "refus");
+    return APRES_CONTINUE;
 }
 
 // L'armement de la prise de vue, appelé une fois la session ouverte : avant l'appairage il n'y a aucune clef,
-// donc rien à chiffrer — la fiche §2 ne propose la photo qu'après le QR. Les deux commandes s'arment avant
-// que la caméra réponde, parce que le second chemin d'AC-1 doit tenir même si l'aperçu ne vient jamais.
+// donc rien à chiffrer — la fiche §2 ne propose la photo qu'après le QR. Les DEUX commandes s'arment ensemble
+// (AC-1 de l'avenant) : chacune ouvre le sélecteur du téléphone qui la regarde, et rien ici n'attend une
+// caméra qui pourrait ne jamais répondre. Un refus d'état (clef périmée, origine hors liste) n'arme rien : la
+// session est close, l'écran dit déjà pourquoi.
 function ouvreLaPrise() {
     sectionPrise.hidden = false;
 
-    boutonDeclencheur.addEventListener("click", function () {
-        prendsLaPhoto().catch(function (imprevu) {
-            affiche("La photo n'a pas pu être prise.", "refus", imprevu && imprevu.name ? imprevu.name : String(imprevu));
+    // AC-1 : « Prendre une photo » ouvre l'appareil photo arrière — et rien d'autre : ni aperçu, ni flux.
+    boutonPrendre.addEventListener("click", ouvreLeSelecteurDePrise);
+
+    // AC-15 : « Charger des photos » ouvre la galerie, plusieurs photos à la fois.
+    boutonCharger.addEventListener("click", ouvreLaGalerie);
+
+    // Le téléphone a rendu une prise validée. Une prise annulée ne rend aucun événement change : ce geste n'a
+    // donc rien à envoyer (AC-1).
+    champAppareil.addEventListener("change", function () {
+        const fichiers = enAttente(champAppareil);
+        videLeChamp(champAppareil);
+        if (fichiers.length === 0)
+            return;
+
+        unePhotoDuTelephone(fichiers[0]).catch(function (imprevu) {
+            leTelephoneNaPasLu();
         });
     });
 
-    selecteurFichier.addEventListener("change", function () {
-        envoieLeFichierChoisi(selecteurFichier.files[0]).catch(function (fichierSansReponse) {
+    // La galerie a rendu n fichiers : ils partent une par une, chacun après la réponse du précédent (AC-15).
+    champGalerie.addEventListener("change", function () {
+        const fichiers = enAttente(champGalerie);
+        videLeChamp(champGalerie);
+        chargeLaGalerie(fichiers).catch(function (serieSansReponse) {
             affiche(MESSAGE_TRANSPORT, "attente");
         });
-    });
-
-    ouvreLaCamera().catch(function (cameraRefusee) {
-        basculeSurLeSelecteur(raisonDeLaCamera(cameraRefusee));
     });
 }
 
