@@ -90,6 +90,10 @@ const ROUTE_APPAIRAGE = "/apparier";         // la route qui lie la page à la c
 const ROUTE_ETAT = "/etat";                  // le battement de cinq secondes, dont la réponse est chiffrée
 const ROUTE_FIN = "/fin";                    // la page se ferme, l'écran du PC passe à « Téléphone déconnecté »
 const EN_TETE_IDENTIFIANT = "X-MTG-Pair";    // SessionChiffree.NomEnTeteTelephone
+const TYPE_DE_CORPS_CHIFFRE = "application/octet-stream";        // le type des deux routes qui attendent une réponse
+const TYPE_DE_CORPS_SANS_PRELIMINAIRE = "text/plain";            // AC-40 : seul type de corps qu'un navigateur
+                                                                 // envoie sans préliminaire CORS — /fin y a droit
+                                                                 // parce qu'il part pendant la fermeture de l'onglet
 const TAILLE_CLE = 32;                       // ChiffrementScan.TailleDeCle : 256 bits, DIR-SCAN-4 v2
 const TAILLE_IDENTIFIANT = 16;               // SessionChiffree.TailleDIdentifiantTelephone
 const TAILLE_ETIQUETTE = 16;                 // ChiffrementScan.TailleDEtiquette : 128 bits, DIR-SCAN-16
@@ -269,8 +273,17 @@ function emetsCompteur() {
 // Une requête vers le PC. targetAddressSpace: "local" (AC-34) est ce que Chrome et Brave exigent pour
 // qu'une page en https parle à une adresse du réseau privé ; les autres navigateurs l'ignorent.
 // credentials: "omit" : aucun cookie, aucun en-tête d'authentification — la clef fait tout (DIR-SCAN-5 v2).
+// AC-40 (correctif SCAN-2-AV3-3 §3) : une seule requête change de type de corps, /fin. Le corps
+// octet-stream n'est pas un type de corps « simple » : hors de l'origine, le navigateur doit alors envoyer
+// un préliminaire OPTIONS avant de pouvoir envoyer le corps. Pour /fin, ce préliminaire doit partir alors
+// que l'onglet se ferme — rien ne le fait aboutir, et le message ne part jamais. text/plain est le seul type
+// de corps qu'un navigateur envoie sans préliminaire ; le corps reste le même message chiffré, octet pour
+// octet (le serveur ne lit aucun Content-Type : il juge la taille, puis les octets), et la route appelante
+// est dans les données associées du message, donc un /fin ne se relit pas sur une autre route.</para>
 async function envoie(route, message, options) {
-    const enTetes = { "Content-Type": "application/octet-stream" };
+    const enTetes = {
+        "Content-Type": route === ROUTE_FIN ? TYPE_DE_CORPS_SANS_PRELIMINAIRE : TYPE_DE_CORPS_CHIFFRE
+    };
     if (options && options.identifiant)
         enTetes[EN_TETE_IDENTIFIANT] = seance.identifiant;
 
@@ -375,7 +388,9 @@ function envoieLaFin() {
     seance.finEnvoyee = true;
 
     // La réponse n'est pas attendue : la page est en train de fermer. keepalive est ce qui laisse le
-    // navigateur finir l'envoi après la fermeture (AC-34 : « envoie /fin à sa fermeture, en keepalive »).
+    // navigateur finir l'envoi après la fermeture (AC-34 : « envoie /fin à sa fermeture, en keepalive »),
+    // et le type de corps text/plain (AC-40, correctif SCAN-2-AV3-3) ce qui le lui laisse commencer sans
+    // préliminaire : le message part seul, sans attendre une réponse OPTIONS qui n'arriverait plus.
     envoie(ROUTE_FIN, message, { keepalive: true }).catch(function (rejet) {
         // /fin peut ne pas partir : le PC passera de lui-même à « Téléphone inactif » puis « Téléphone
         // déconnecté » (AC-36), et la clef meurt à la fermeture de l'écran du PC (DIR-SCAN-5 v2).
