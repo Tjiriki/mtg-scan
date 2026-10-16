@@ -31,19 +31,52 @@
 <style>
 :root { color-scheme: light dark; }
 html { -webkit-text-size-adjust: 100%; }
+/* SCAN-3, décision de Thomas du 2026-10-16 14:43:41 (docs/THOMAS_DECISION_SCAN-3_PageTelephone.md §2), rendue
+   après le R-RUN du téléphone : « le bouton “Prendre la photo” est sous le bas de l'écran du téléphone : il
+   faut faire défiler la page pour l'atteindre ». Tenu en portrait, la page tient donc entière à l'écran, sans
+   barre de défilement — aperçu de la caméra, bouton et message vus ensemble. Trois choses y suffisent : le corps
+   a une hauteur DEFINIE d'écran (height, et non min-height : seule une hauteur définie contraint la chaîne de
+   flexion et laisse l'aperçu se réduire), les espacements et les corps de lettre sont réduits, et l'aperçu de la
+   caméra est la seule pièce élastique : il cède sa hauteur avant les textes, jamais l'inverse. La hauteur est
+   100dvh, l'écran visible barres d'outillage comprises, 100vh restant le repli pour un navigateur qui ne connaît
+   pas l'unité ; overflow: hidden ferme le défilement de la page. Ce que la sonde Edge sans tête du 2026-10-16 a
+   rendu à 412 × 820 (fenêtre interne 725 px), une trame de 720 × 1280 branchée sur l'aperçu et le paragraphe de
+   détail rempli d'une réponse longue — avant la correction : scrollH=852 pour innerH=725, aperçu à camH=406,
+   bouton à btnTop=762 btnBottom=824, btnVisible=false ; après : scrollH=725, defile=false, aperçu réduit à
+   camH=417, bouton à btnTop=660 btnBottom=713, btnVisible=true. Sortie consignée au journal SCAN-3, bloc
+   [2026-10-16 15:00:54-a], docs\mesures\SCAN-3\51_p6_s6_sonde_pair.txt. Ce que la correction ne couvre pas :
+   overflow: hidden ne fait pas défiler, il coupe — une réponse plus longue que la place laissée par l'aperçu
+   serait tronquée, non défilée, et seul le téléphone du R-RUN le dira. Ce qu'elle ne touche pas : le protocole,
+   la politique de contenu, le fragment effacé, le battement et la route /fin sont les mêmes, et aucune phrase
+   n'est raccourcie — les sept phrases d'état de la v1 sont rendues mot pour mot (AC-11), ce sont elles que le
+   test de la page relit une à une. */
 body {
     margin: 0;
-    padding: 28px 20px;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 14px 12px;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    font-size: 19px;
-    line-height: 1.45;
+    font-size: 17px;
+    line-height: 1.3;
     background: #14161a;
     color: #f2f3f5;
 }
-main { max-width: 32em; margin: 0 auto; }
+main {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    max-width: 32em;
+    margin: 0 auto;
+}
 .marque {
-    margin: 0 0 18px;
-    font-size: 15px;
+    margin: 0 0 6px;
+    font-size: 13px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: #9aa3b2;
@@ -51,13 +84,13 @@ main { max-width: 32em; margin: 0 auto; }
 /* L'état tient sur une ligne courte : c'est ce que Thomas lit sur l'écran du téléphone posé (AC-34). */
 .etat {
     margin: 0;
-    font-size: 25px;
+    font-size: 21px;
     font-weight: 600;
     overflow-wrap: anywhere;
 }
 .detail {
-    margin: 14px 0 0;
-    font-size: 16px;
+    margin: 6px 0 0;
+    font-size: 15px;
     color: #b9c0cc;
     overflow-wrap: anywhere;
 }
@@ -65,15 +98,30 @@ main { max-width: 32em; margin: 0 auto; }
 .connecte { color: #57d38c; }
 .refus { color: #ff8f8f; }
 .attente { color: #f0c674; }
-/* SCAN-3, AC-1 : la prise de vue occupe le bas de l'écran, l'aperçu de la caméra gardant son rapport
-   d'image (l'appareil rend ce qu'il voit, la page ne déforme rien). Rien n'est masqué au clavier : les deux
-   commandes sont de vrais boutons, atteignables au doigt comme au pouce. */
-.prise { margin: 22px 0 0; }
+/* SCAN-3, AC-1 et décision du 2026-10-16 14:43:41 : la prise de vue occupe le bas de l'écran, l'aperçu de la
+   caméra gardant son rapport d'image (object-fit: contain — l'appareil rend ce qu'il voit, la page ne déforme
+   rien). La section et l'aperçu sont les deux seuls morceaux élastiques de la page (flex: 1 1 auto,
+   min-height: 0) : quand une réponse longue monte dans le paragraphe de détail, c'est l'aperçu qui se réduit,
+   jamais le bouton — sa base de flexion est grande, celle des lignes de texte est petite, c'est donc lui qui
+   cède, et le bouton reste au-dessus du bord de l'écran. Rien n'est masqué au clavier : les deux commandes
+   sont de vrais boutons, atteignables au doigt comme au pouce. */
+.prise {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 12px 0 0;
+}
 .prise[hidden] { display: none; }
+/* Le titre que la fiche impose à AC-11 (« Scanne la carte ») est un h1 de la classe .etat : il était écrit au
+   corps 25 px comme la ligne d'état, soit 36 px comptés dans le défilement du téléphone. Il garde son texte,
+   sa place et sa fonction de titre ; il prend le corps du texte courant. */
+#prise h1 { font-size: 17px; }
 #camera {
     display: block;
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
-    max-height: 56vh;
     object-fit: contain;
     background: #000;
     border-radius: 10px;
@@ -81,11 +129,12 @@ main { max-width: 32em; margin: 0 auto; }
 #camera[hidden] { display: none; }
 .bouton {
     display: block;
+    flex: 0 0 auto;
     width: 100%;
-    margin: 14px 0 0;
-    padding: 16px 18px;
+    margin: 10px 0 0;
+    padding: 14px 18px;
     font: inherit;
-    font-size: 21px;
+    font-size: 19px;
     font-weight: 600;
     color: #10131a;
     background: #e7eaf0;
@@ -93,9 +142,31 @@ main { max-width: 32em; margin: 0 auto; }
     border-radius: 10px;
 }
 .bouton[disabled] { opacity: 0.55; }
-/* Le sélecteur de fichier reste dans le DOM — AC-1 l'exige armé « capture="environment" » — mais n'est
-   jamais cliquable au doigt : c'est la page qui le déclenche quand la caméra refuse de s'ouvrir. */
-#fichier { display: none; }
+/* Le déclencheur se masque par son attribut hidden quand la caméra refuse : sans cette ligne, le
+   `display: block` du-dessus l'emporterait sur l'attribut, comme pour le sélecteur en dessous. */
+.bouton[hidden] { display: none; }
+/* Le sélecteur de fichier reste dans le DOM — AC-1 l'exige armé « capture="environment" » — et n'apparaît que
+   quand la caméra refuse : c'est le second chemin d'AC-1, « sinon le sélecteur de fichier s'ouvre ». Il est
+   masqué par son attribut hidden, comme la section et l'aperçu au-dessus, et basculeSurLeSelecteur retire cet
+   attribut — il ne pourrait pas si une règle d'auteur le maintenait en `display: none`, ce qui l'emporte sur le
+   retrait de l'attribut : c'est le défaut levé par docs/THOMAS_DECISION_SCAN-3_SecoursEtMesure19.md (constat §1,
+   décision §2, 2026-10-16). Visible, il prend la figure du bouton et la place que la même bascule rend, donc la
+   page n'a toujours rien à défiler (décision du 2026-10-16 14:43:41, §2, tenue). */
+#fichier[hidden] { display: none; }
+#fichier {
+    display: block;
+    flex: 0 0 auto;
+    width: 100%;
+    margin: 10px 0 0;
+    padding: 14px 18px;
+    font: inherit;
+    font-size: 19px;
+    font-weight: 600;
+    color: #10131a;
+    background: #e7eaf0;
+    border: 0;
+    border-radius: 10px;
+}
 </style>
 </head>
 <body>
@@ -112,9 +183,9 @@ main { max-width: 32em; margin: 0 auto; }
         <canvas id="toile" width="0" height="0" hidden></canvas>
         <button id="declencheur" class="bouton" type="button">Prendre la photo</button>
         <!-- AC-1, second chemin : « sinon le sélecteur de fichier s'ouvre ». capture="environment" est ce qui
-             demande l'appareil photo plutôt que la galerie ; l'élément reste caché, c'est la page qui le
-             déclenche quand la caméra refuse de s'ouvrir. -->
-        <input id="fichier" type="file" accept="image/*" capture="environment">
+             demande l'appareil photo plutôt que la galerie ; l'élément arrive masqué par son attribut hidden,
+             que basculeSurLeSelecteur retire quand la caméra refuse — c'est alors lui que le doigt atteint. -->
+        <input id="fichier" type="file" accept="image/*" capture="environment" hidden>
     </section>
     <noscript class="detail">Cette page a besoin de JavaScript pour chiffrer ses échanges avec le PC.</noscript>
 </main>
@@ -770,9 +841,11 @@ function raisonDeLaCamera(echec) {
     return "La caméra n'a pas répondu.";
 }
 
-// AC-1, second chemin : « sinon le sélecteur de fichier s'ouvre ». Le clic vient du geste qui a ouvert la
-// prise — c'est un geste de l'utilisateur, seul chemin qu'un navigateur laisse prendre pour l'appareil photo
-// par cette voie.
+// AC-1, second chemin : « sinon le sélecteur de fichier s'ouvre ». Ce que la page fait ici est littéral : elle
+// rend le sélecteur visible et touchable en levant son attribut hidden — elle ne clique pas à la place de
+// l'utilisateur, ce qu'aucun navigateur ne laisse faire hors d'un geste de lui. L'aperçu et le déclencheur se
+// masquent par le même attribut (règles #camera[hidden] et .bouton[hidden] de la feuille de style), si bien que
+// le secours prend la place rendue et que la page ne se met pas à défiler.
 function basculeSurLeSelecteur(raison) {
     relacheLaCamera();
     champCamera.hidden = true;
