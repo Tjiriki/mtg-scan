@@ -614,8 +614,47 @@ async function demandeEtat() {
     }
 
     const libelle = Object.prototype.hasOwnProperty.call(ETATS, mot) ? ETATS[mot] : ETATS.inconnu;
-    affiche(libelle, mot === "connecte" ? "connecte" : (mot === "inactif" ? "attente" : "refus"));
+    affiche(libelle, mot === "connecte" ? "connecte" : (mot === "inactif" ? "attente" : "refus"),
+        suiviDesPhotos(recu));
     return true;
+}
+
+// SCAN-FIX P3 : ce que le PC dit des photos reçues, quand il reconnaît en arrière-plan — « photos » est une
+// liste { id, etat, nom, extension, numero } portée par la réponse chiffrée de /etat. Les mots du protocole
+// (en_attente, en_cours, reconnue, a_valider, non_reconnue, erreur) ne se montrent pas : la page compte et dit
+// en français. Un PC qui ne rend pas cette liste (reconnaissance dans l'appel) ne change rien à l'écran.
+function suiviDesPhotos(recu) {
+    if (recu === null || !Array.isArray(recu.photos) || recu.photos.length === 0)
+        return undefined;
+
+    let attente = 0, reconnues = 0, aValider = 0, perdues = 0;
+    let derniere = "";
+    recu.photos.forEach(function (photo) {
+        if (photo === null || typeof photo !== "object")
+            return;
+        if (photo.etat === "en_attente" || photo.etat === "en_cours") {
+            attente += 1;
+        } else if (photo.etat === "reconnue") {
+            reconnues += 1;
+            if (typeof photo.nom === "string")
+                derniere = photo.nom;
+        } else if (photo.etat === "a_valider") {
+            aValider += 1;
+        } else {
+            perdues += 1;
+        }
+    });
+
+    const morceaux = [];
+    if (attente > 0)
+        morceaux.push(attente + " en attente");
+    if (reconnues > 0)
+        morceaux.push(reconnues + " reconnue" + (reconnues > 1 ? "s" : ""));
+    if (aValider > 0)
+        morceaux.push(aValider + " à valider sur le PC");
+    if (perdues > 0)
+        morceaux.push(perdues + " à reprendre");
+    return morceaux.join(" · ") + (derniere === "" ? "" : " — dernière : " + derniere);
 }
 
 // La boucle de l'écran. Un seul échange à la fois : un battement qui traîne sur un réseau encombré passe son
@@ -1096,6 +1135,17 @@ function renduDeLaPhoto(clair) {
 
     if (typeof recu.refus === "string" && recu.refus === "minute")
         return APRES_ARRET;
+
+    // SCAN-FIX P3 : le PC met la photo à l'abri et répond tout de suite ; la reconnaissance se fait ensuite, et
+    // son résultat arrive par le battement d'état (suiviDesPhotos). « recu » est l'empreinte de la photo : elle
+    // ne se montre pas. La photo suivante peut partir sans attendre.
+    if (typeof recu.recu === "string") {
+        const attente = typeof recu.enAttente === "number" ? recu.enAttente : 0;
+        affiche("Photo reçue par le PC.", "connecte",
+            attente > 1 ? attente + " photos en attente de reconnaissance — tu peux continuer."
+                        : "Reconnaissance en cours — tu peux prendre la suivante.");
+        return APRES_CONTINUE;
+    }
 
     if (typeof recu.refus === "string") {
         affiche(
