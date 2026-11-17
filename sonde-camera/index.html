@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; media-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<!-- 1.3a CAM-PREUVE (docs/ARCHITECTE_FICHE_DEV_1.3a_SondeCamera.md §2) — la sonde qui mesure, sur le téléphone
+     de Thomas, la caméra ouverte DANS la page. Elle ne remplace rien : la v2 n'est pas touchée, elle garde son
+     appareil photo natif et ses deux boutons. La sonde, elle : elle ouvre l'objectif du dos, l'affiche, prend
+     deux sortes de photos, et écrit pour chacune sa taille et le temps qu'elle a pris.
+
+     Ce qu'elle ne fait pas, et c'est ce qui la rend sans risque : elle n'envoie rien — « connect-src 'none' »
+     ferme la seule destination que la v2 laissait ouverte, l'adresse du PC local —, elle n'écrit rien sur le
+     téléphone (aucun stockage, aucun téléchargement, aucune URL d'objet), et elle ne montre jamais la photo :
+     seules ses dimensions sont lues, puis la photo est libérée.
+
+     Pourquoi la mesure est nécessaire (fait d'archive, avenant SCAN-3 AV1 §1 du 2026-10-16) : l'aperçu en
+     direct de la v2 d'origine demandait la caméra avec facingMode seul et prenait la trame à la taille du flux ;
+     le flux par défaut d'Android est petit, 11 photos sur 12 « Non reconnue ». La sonde demande donc la plus
+     grande résolution que la piste annonce, et mesure chaque photo — c'est de là que sort le verdict de D-1.
+
+     La politique de contenu est la balise <meta> de la v2 (v2/index.html l.29) au caractère près, à un seul
+     changement (fiche §2, ligne « CSP », et AC-4) : « connect-src http: » devient « connect-src 'none' ». Ce
+     sont les deux termes que le test d'AC-4 compare, l'un à l'autre. « media-src 'none' » et « img-src 'none' »
+     restent donc ceux de la v2 : l'hypothèse à mesurer (R-2 du cadrage, fiche §2) est qu'ils n'empêchent ni
+     d'afficher un flux attribué par srcObject, ni de lire un Blob par createImageBitmap. Si l'aperçu ne
+     s'affiche pas, la politique NE change PAS ici : ce serait le résultat de la preuve, et l'assouplissement
+     appartient à SECOPS en 1.3b. -->
+<title>MTG Manager — Sonde caméra</title>
+<style>
+:root { color-scheme: light dark; }
+html { -webkit-text-size-adjust: 100%; }
+/* Aucune police, aucune image, aucun fichier de style à télécharger : « font-src 'none' », « img-src 'none' »
+   et « default-src 'none' » les refuseraient, et la sonde est un fichier unique (comme la v1 et la v2). */
+body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    line-height: 1.4;
+}
+main {
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+h1 { font-size: 1.25rem; margin: 0; }
+.etat { font-weight: 600; margin: 0; }
+.detail { margin: 0; font-size: 0.9rem; opacity: 0.85; overflow-wrap: anywhere; }
+/* L'aperçu tient l'écran sans rien télécharger : le noir est une couleur, pas une image. « contain » garde le
+   cadre de la caméra à son rapport, sans l'étirer — la taille mesurée, elle, se lit hors de l'affichage. */
+.apercu { width: 100%; aspect-ratio: 3 / 4; object-fit: contain; background: #000; border-radius: 0.5rem; }
+.bouton {
+    font: inherit;
+    padding: 0.9rem 1rem;
+    border: 1px solid currentColor;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+}
+.bouton:disabled { opacity: 0.5; }
+/* Les lignes de mesures se recopient au R-RUN : une zone de texte se sélectionne sous le doigt. */
+.resultats {
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 12rem;
+}
+[hidden] { display: none; }
+</style>
+<body>
+<main>
+    <h1>Sonde caméra — 1.3a</h1>
+    <p id="etat" class="etat" role="status" aria-live="polite">Caméra fermée.</p>
+    <p id="detail" class="detail" role="status" aria-live="polite"></p>
+    <!-- Fiche §2, ligne « Résultats », second volet : au-dessus des lignes de photos, la taille du flux obtenu
+         et la plus grande taille de capture annoncée par la caméra. -->
+    <p id="tailles" class="detail">Flux obtenu : aucune — Capture annoncée : aucune annonce</p>
+    <!-- AC-1 : « l'aperçu s'affiche dans un élément vidéo de la page ». Les trois attributs sont ce que demande
+         Android pour lire un flux dans la page plutôt que d'ouvrir un écran plein écran : sans eux l'aperçu
+         reste noir ou part en lecture séparée. Aucun attribut src : le flux vient de srcObject, donc de rien
+         que « media-src 'none' » aurait à charger. -->
+    <video id="apercu" class="apercu" muted playsinline autoplay></video>
+    <button id="ouvrir" class="bouton" type="button">Ouvrir la caméra</button>
+    <!-- AC-6 : au retour de l'écran éteint, la piste est souvent terminée — un appui suffit à la reprendre. -->
+    <button id="rouvrir" class="bouton" type="button" hidden>Rouvrir la caméra</button>
+    <button id="capture" class="bouton" type="button" disabled>Photo (capture)</button>
+    <button id="trame" class="bouton" type="button" disabled>Photo (trame)</button>
+    <!-- La toile ne se montre jamais : elle tient le cadre à la taille réelle du flux au moment de l'appui,
+         puis repasse à zéro. La capture, elle, ne passe par aucune toile ni aucune balise image. -->
+    <canvas id="toile" width="0" height="0" hidden></canvas>
+    <!-- Fiche §2, ligne « Résultats » : une ligne par photo, la plus récente en haut. Thomas sélectionne cette
+         zone et recopie ses mesures dans le chat au R-RUN (E3 et E4). -->
+    <textarea id="resultats" class="resultats" rows="12" readonly spellcheck="false" autocomplete="off"
+              aria-label="Photos prises par la sonde"></textarea>
+    <noscript class="detail">Cette page a besoin de JavaScript pour ouvrir la caméra.</noscript>
+</main>
+<script>
+"use strict";
+
+// ————— l'état de la sonde : en mémoire de script, et dans aucun stockage du navigateur —————
+let flux = null;              // le MediaStream rendu par getUserMedia, ou null caméra fermée
+let piste = null;             // sa piste vidéo : celle que l'aperçu affiche et qu'ImageCapture capture
+let capteur = null;           // l'ImageCapture de cette piste, ou null si le navigateur n'en a pas ou l'a refusée
+let bornes = null;            // les tailles maximales que la piste annonce, ou null avant l'ouverture
+let raisonSansCapteur = "";   // la phrase que « Photo (capture) » doit à l'appui quand ImageCapture manque
+let numero = 0;               // le n° des lignes de la zone de résultats
+let fileDePrises = Promise.resolve();
+
+const zoneEtat = document.getElementById("etat");
+const zoneDetail = document.getElementById("detail");
+const zoneTailles = document.getElementById("tailles");
+const zoneResultats = document.getElementById("resultats");
+const apercu = document.getElementById("apercu");
+const toile = document.getElementById("toile");
+const boutonOuvrir = document.getElementById("ouvrir");
+const boutonRouvrir = document.getElementById("rouvrir");
+const boutonCapture = document.getElementById("capture");
+const boutonTrame = document.getElementById("trame");
+
+// ————— ce que la page montre —————
+// Fiche §2, ligne « Erreurs » : « Accès refusé, caméra absente, erreur de prise : un message en clair dans la
+// page (nom de l'erreur compris) ». Le nom de l'erreur se lit à l'écran et se recopie dans le chat du R-RUN :
+// c'est lui qui dit ce que le téléphone a refusé, sans qu'on ait à le deviner.
+function affiche(message, detail) {
+    zoneEtat.textContent = message;
+    zoneDetail.textContent = detail === undefined ? "" : detail;
+}
+
+function enClair(erreur) {
+    const nom = erreur && erreur.name ? erreur.name : "Erreur";
+    return erreur && erreur.message ? nom + " : " + erreur.message : nom;
+}
+
+function phrasePour(erreur) {
+    switch (erreur && erreur.name ? erreur.name : "") {
+        case "NotAllowedError":
+        case "PermissionDeniedError":
+            return "Accès refusé à la caméra";
+        case "NotFoundError":
+        case "DevicesNotFoundError":
+            return "Caméra absente : aucune piste ne répond";
+        case "NotReadableError":
+        case "TrackStartError":
+            return "Caméra occupée : une autre application la tient";
+        case "OverconstrainedError":
+            return "La caméra refuse la demande : aucune de ses tailles ne convient";
+        case "SecurityError":
+            return "La page n'a pas le droit d'ouvrir la caméra (elle doit être servie en HTTPS)";
+        case "NotSupportedError":
+            return "Ce navigateur ne sait pas ouvrir la caméra";
+        default:
+            return "La caméra n'a pas répondu";
+    }
+}
+
+// Une erreur que le navigateur ne nomme pas lui-même porte quand même un nom : la fiche en veut un, pas un
+// message vague. Elle suit le même chemin d'affichage que les erreurs du téléphone.
+function erreurNommee(nom, message) {
+    const erreur = new Error(message);
+    erreur.name = nom;
+    return erreur;
+}
+
+// Couper proprement : les pistes s'arrêtent — le témoin de la caméra s'éteint —, l'aperçu se vide. Il ne reste
+// aucune photo : la bitmap est fermée par sa preneuse, la toile remise à zéro, le Blob rendu au ramasse-miettes.
+function relacheLeFlux() {
+    if (flux !== null) {
+        for (const morceau of flux.getTracks())
+            morceau.stop();
+    }
+    flux = null;
+    piste = null;
+    capteur = null;
+    bornes = null;
+    apercu.srcObject = null;
+}
+
+// ————— la plus grande résolution que la caméra annonce (fiche §2, ligne « Ouverture ») —————
+//
+// Deux temps, parce que la taille maximale ne s'apprend qu'auprès de la piste ouverte : getUserMedia rend une
+// piste, getCapabilities rend ses bornes (maxWidth / maxHeight, et maxPhotoWidth / maxPhotoHeight pour la
+// photo), applyConstraints les exige. C'est la réponse écrite au constat de l'avenant AV1 : là où la v2
+// d'origine se contentait du flux par défaut, la sonde demande le plafond annoncé par l'objectif.
+function borneMaximale(borne) {
+    if (Array.isArray(borne))
+        return borne.length === 0 ? 0 : Math.max.apply(null, borne);
+    return typeof borne === "number" ? borne : 0;
+}
+
+function litLesBornesDeLaPiste() {
+    // Deux formes à lire : le navigateur rend une valeur unique ou une liste — Chrome rend maxWidth: [4032],
+    // d'autres rendent 4032. Une liste vide, comme l'absence de la borne, vaut « non annoncé » (0).
+    const capacites = typeof piste.getCapabilities === "function" ? piste.getCapabilities() : {};
+    const largeur = borneMaximale(capacites.maxWidth);
+    const hauteur = borneMaximale(capacites.maxHeight);
+    const photoLargeur = borneMaximale(capacites.maxPhotoWidth);
+    const photoHauteur = borneMaximale(capacites.maxPhotoHeight);
+
+    bornes = {
+        largeur: largeur,
+        hauteur: hauteur,
+        // Une piste qui n'annonce pas de taille de photo n'en annonce qu'une : celle du flux.
+        photoLargeur: photoLargeur === 0 ? largeur : photoLargeur,
+        photoHauteur: photoHauteur === 0 ? hauteur : photoHauteur,
+    };
+}
+
+// « ideal », jamais « exact » : une caméra qui ne monte pas au plafond rend sa meilleure taille au lieu de
+// refuser l'ouverture. La sonde mesure alors ce qu'elle a obtenu, et l'écrit — c'est la mesure, pas le confort.
+async function appliqueLaPlusGrandeResolution() {
+    if (bornes === null || bornes.largeur === 0 || bornes.hauteur === 0)
+        return;
+    if (typeof piste.applyConstraints !== "function")
+        return;
+
+    try {
+        await piste.applyConstraints({
+            advanced: [{ width: { ideal: bornes.largeur }, height: { ideal: bornes.hauteur } }],
+        });
+    } catch (refusDeLaPiste) {
+        // Rien de plus à en dire : la taille restée active est celle que le téléphone a rendue, et la ligne de
+        // taille l'affiche. Un refus de contrainte n'interdit pas de prendre une photo.
+    }
+}
+
+// L'ImageCapture de la piste, à la plus grande taille de capture annoncée (fiche §2, ligne « Deux prises »).
+// Les navigateurs qui ne l'ont pas laissent le capteur à null : le bouton le dit à l'appui, sans plantage.
+function prepareLeCapteur() {
+    capteur = null;
+    raisonSansCapteur = "";
+
+    if (typeof ImageCapture !== "function") {
+        raisonSansCapteur = "ImageCapture est absent de ce navigateur : « Photo (capture) » n'est pas possible "
+            + "ici, « Photo (trame) » l'est.";
+        return;
+    }
+
+    try {
+        capteur = (bornes !== null && bornes.photoLargeur > 0 && bornes.photoHauteur > 0)
+            ? new ImageCapture(piste, { photoWidth: bornes.photoLargeur, photoHeight: bornes.photoHauteur })
+            : new ImageCapture(piste);
+    } catch (refusDuCapteur) {
+        capteur = null;
+        raisonSansCapteur = "ImageCapture a refusé la piste (" + enClair(refusDuCapteur) + ") : « Photo (capture) » "
+            + "n'est pas possible ici, « Photo (trame) » l'est.";
+    }
+}
+
+// Fiche §2, ligne « Résultats », premier volet : au-dessus des lignes de photos, la taille du flux obtenu et la
+// plus grande taille de capture annoncée. Ce sont les deux nombres que Thomas relève à E2.
+function afficheLesTailles() {
+    const reglage = (piste !== null && typeof piste.getSettings === "function") ? piste.getSettings() : {};
+    const tailleDuFlux = (reglage.width && reglage.height) ? reglage.width + " × " + reglage.height + " px" : "aucune";
+    const tailleDeCapture = (bornes !== null && bornes.photoLargeur > 0 && bornes.photoHauteur > 0)
+        ? bornes.photoLargeur + " × " + bornes.photoHauteur + " px"
+        : "aucune annonce";
+
+    zoneTailles.textContent = "Flux obtenu : " + tailleDuFlux + " — Capture annoncée : " + tailleDeCapture;
+}
+
+// ————— AC-1 : ouvrir l'objectif du dos —————
+async function ouvreLaCamera() {
+    relacheLeFlux();
+    boutonRouvrir.hidden = true;
+    boutonCapture.disabled = true;
+    boutonTrame.disabled = true;
+
+    if (typeof navigator.mediaDevices === "undefined" || navigator.mediaDevices === null
+        || typeof navigator.mediaDevices.getUserMedia !== "function") {
+        affiche("Ce navigateur ne sait pas ouvrir la caméra",
+            "navigator.mediaDevices.getUserMedia est absent — il n'existe qu'en HTTPS, et la sonde se lit sur Brave.");
+        return;
+    }
+
+    affiche("Ouverture de la caméra…", "La plus grande taille se demande une fois la piste ouverte.");
+    try {
+        // facingMode « environment » en idéal : l'objectif du dos. Rien d'autre n'est demandé ici — le plafond
+        // s'apprend auprès de la piste, juste après.
+        flux = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { facingMode: { ideal: "environment" } },
+        });
+
+        piste = flux.getVideoTracks()[0];
+        if (!piste)
+            throw erreurNommee("NoTrackError", "getVideoTracks() ne rend aucune piste vidéo");
+
+        litLesBornesDeLaPiste();
+        await appliqueLaPlusGrandeResolution();
+
+        // L'aperçu : srcObject, jamais un attribut src ni une URL d'objet. « media-src 'none' » ne regarde aucun
+        // chargement, puisqu'il n'y en a aucun — c'est l'hypothèse R-2 que le R-RUN E2 mesure.
+        apercu.srcObject = flux;
+        if (typeof apercu.play === "function")
+            apercu.play().then(() => {}, () => {});   // un refus de lecture automatique n'est pas un résultat
+
+        prepareLeCapteur();
+        boutonCapture.disabled = false;
+        boutonTrame.disabled = false;
+        afficheLesTailles();
+        affiche("Caméra ouverte.", "Deux méthodes, deux boutons : « Photo (capture) » et « Photo (trame) »."
+            + (raisonSansCapteur === "" ? "" : " " + raisonSansCapteur));
+    } catch (erreurOuverture) {
+        relacheLeFlux();
+        afficheLesTailles();
+        affiche(phrasePour(erreurOuverture), enClair(erreurOuverture));
+    }
+}
+
+// ————— les deux prises (fiche §2, ligne « Deux prises ») et leurs mesures (ligne « Résultats ») —————
+//
+// AC-3 : « dix appuis à la suite sur une même méthode : dix lignes ». Un appui qui arrive pendant une prise
+// n'est donc pas ignoré — il manquerait une ligne, et le temps ne se lirait plus : il prend son rang. Chaque
+// photo porte le temps écoulé entre SON appui et la photo disponible, dimensions lues : c'est là que le
+// téléphone paraît saturer s'il sature.
+function metsDansLaFile(prendre) {
+    const appui = performance.now();
+    fileDePrises = fileDePrises.then(() => prendre(appui), () => prendre(appui));
+}
+
+// Une ligne par photo, ajoutée en haut : la plus récente se lit sans faire défiler, aucune n'écrase la
+// précédente. La ligne porte le n°, la méthode, la largeur × hauteur et le temps en ms — les quatre choses que
+// la fiche §2 nomme, et rien d'autre.
+function unePhoto(methode, largeur, hauteur, tempsMs) {
+    numero += 1;
+    const temps = Math.round(tempsMs);
+    zoneResultats.value = numero + ". " + methode + " — " + largeur + " × " + hauteur + " px — " + temps
+        + " ms\n" + zoneResultats.value;
+    affiche("Photo " + numero + " : " + largeur + " × " + hauteur + " px", methode + " en " + temps + " ms");
+}
+
+// Le garde-fou commun aux deux boutons : la caméra doit être ouverte et vivante. « Rouvrir la caméra » reparaît
+// pour que le geste reste à portée du doigt (AC-6) et la page reste utilisable (AC-5).
+function laCameraEstVivante() {
+    if (piste !== null && piste.readyState === "live")
+        return true;
+
+    if (piste !== null)
+        boutonRouvrir.hidden = false;
+    affiche("Caméra fermée", "« Ouvrir la caméra » d'abord — les mesures déjà écrites restent lisibles.");
+    return false;
+}
+
+// « Photo (capture) » : takePhoto, à la plus grande taille annoncée par la caméra. Les dimensions se lisent sur
+// le Blob rendu par createImageBitmap — le chemin de la v2 (jpegDuFichier, v2/index.html l.899), qui tourne sous
+// la même politique « img-src 'none' » : aucune balise image, aucune URL d'objet, donc aucun chargement que la
+// politique aurait à refuser.
+async function prendsLaCapture(appui) {
+    if (capteur === null) {
+        // Fiche §2, ligne « Deux prises » : « Si ImageCapture manque, le premier bouton le dit, sans plantage. »
+        affiche("Photo (capture) impossible",
+            raisonSansCapteur === "" ? "Aucun capteur d'image n'est prêt — rouvre la caméra." : raisonSansCapteur);
+        return;
+    }
+    if (!laCameraEstVivante())
+        return;
+
+    const debut = appui === undefined ? performance.now() : appui;
+    let photo = null;
+    let image = null;
+    try {
+        photo = await capteur.takePhoto();
+        image = await createImageBitmap(photo, { imageOrientation: "from-image" });
+        if (image.width === 0 || image.height === 0)
+            throw erreurNommee("EmptyBitmapError", "createImageBitmap rend une image de côté nul");
+        unePhoto("capture", image.width, image.height, performance.now() - debut);
+    } catch (erreurPrise) {
+        affiche("Photo (capture) manquée", "takePhoto / createImageBitmap — " + enClair(erreurPrise));
+    } finally {
+        if (image !== null)
+            image.close();   // la bitmap n'a servi qu'à lire la taille : elle ne reste pas en mémoire
+        photo = null;        // le Blob ne se montre pas, ne se télécharge pas, ne se stocke pas
+    }
+}
+
+// « Photo (trame) » : l'image courante du flux, à sa taille réelle — ce que la v2 d'origine envoyait, et le
+// terme de la comparaison avec la capture. Les dimensions d'une trame sont celles de la vidéo (fiche §2, ligne
+// « Résultats ») ; la toile ne fait que tenir le cadre à cette taille, puis repasse à zéro.
+async function prendsLaTrame(appui) {
+    if (!laCameraEstVivante())
+        return;
+
+    const largeur = apercu.videoWidth;
+    const hauteur = apercu.videoHeight;
+    if (largeur === 0 || hauteur === 0) {
+        affiche("Photo (trame) impossible",
+            "Aucune image dans l'aperçu (videoWidth = 0) — attends une seconde que le flux tourne, ou rouvre la caméra.");
+        return;
+    }
+
+    const debut = appui === undefined ? performance.now() : appui;
+    try {
+        toile.width = largeur;
+        toile.height = hauteur;
+        const pinceau = toile.getContext("2d");
+        if (pinceau === null)
+            throw erreurNommee("NoContext2DError", "getContext(\"2d\") ne rend rien");
+        pinceau.drawImage(apercu, 0, 0, largeur, hauteur);
+        unePhoto("trame", largeur, hauteur, performance.now() - debut);
+    } catch (erreurPrise) {
+        toile.width = 0;
+        toile.height = 0;
+        affiche("Photo (trame) manquée", "drawImage — " + enClair(erreurPrise));
+        return;
+    }
+
+    toile.width = 0;
+    toile.height = 0;   // la photo est libérée : rien ne reste sur le téléphone
+}
+
+// ————— AC-6 : l'écran s'éteint, la piste meurt ; au retour, la sonde reprend sans recharger —————
+//
+// La fiche écrivait deux issues : la rouvrir seule, ou demander un appui. La sonde choisit l'appui —
+// « Rouvrir la caméra » : une caméra qui se rouvre seule ne dit pas à Thomas à quel instant la reprendre, et
+// un appui suffit (AC-6, « en un appui au plus, sans recharger »).
+function auRetourAUecran() {
+    if (document.visibilityState !== "visible")
+        return;              // c'est la sortie d'écran : rien à faire avant le retour
+    if (piste === null)
+        return;              // la caméra n'a jamais été ouverte : rien à rouvrir
+    if (piste.readyState === "live" && flux !== null && flux.active)
+        return;              // la piste tient : l'aperçu est encore affiché
+
+    boutonCapture.disabled = true;
+    boutonTrame.disabled = true;
+    boutonRouvrir.hidden = false;
+    affiche("La caméra s'est coupée pendant l'absence",
+        "« Rouvrir la caméra » — un appui, sans recharger la page. Les mesures déjà écrites restent lisibles.");
+}
+
+// ————— les quatre appuis : ouvrir, rouvrir, les deux prises (AC-1, AC-6, « Deux prises ») —————
+boutonOuvrir.addEventListener("click", () => { ouvreLaCamera(); });
+boutonRouvrir.addEventListener("click", () => { ouvreLaCamera(); });
+boutonCapture.addEventListener("click", () => { metsDansLaFile(prendsLaCapture); });
+boutonTrame.addEventListener("click", () => { metsDansLaFile(prendsLaTrame); });
+document.addEventListener("visibilitychange", auRetourAUecran);
+</script>
+</body>
+</html>
