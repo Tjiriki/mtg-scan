@@ -6,11 +6,14 @@
      2026-10-16 16:18:23) : la page v2, publiée sous https://tjiriki.github.io/mtg-scan/v2/
      (OriginesScan.UrlPage), est la page v1 avec la prise de vue en plus — « mêmes règles que la v1 : mêmes
      phrases, mêmes chemins, mêmes garde-fous ». Ce qui change est écrit au bloc « PRISE DE VUE » plus bas dans
-     le script : les DEUX commandes du téléphone — « Prendre une photo » (l'appareil photo arrière) et
-     « Charger des photos » (la galerie, plusieurs à la fois) — le réencodage JPEG de chaque image d'origine et
-     la route chiffrée /photo. L'aperçu en direct et le sélecteur de secours ont été retirés à l'avenant AV1 :
-     la page ne demande plus de flux, elle ne capture plus de trame. La v1 reste publiée telle quelle sous
-     /v1/, et ne reçoit aucune de ces lignes.
+     le script : les DEUX commandes du téléphone — « Prendre une photo » et « Charger des photos » (la galerie,
+     plusieurs à la fois) — le réencodage JPEG de chaque image d'origine et la route chiffrée /photo.
+     1.3b (docs/ARCHITECTE_FICHE_DEV_1.3b_CameraDansLaPage.md) rend la caméra à la page : « Prendre une photo »
+     ouvre l'objectif dans la page sur l'appui du doigt, jamais au chargement, chaque appui sur « Photo » rend
+     une prise et la caméra reste ouverte. Le sélecteur de l'avenant AV1 n'est pas jeté pour autant : il tient
+     le repli quand la caméra de la page est refusée (fiche §2, ligne « Repli »). Ce qui ne change pas d'un
+     octet : la photo n'a jamais pour origine ce que l'aperçu affiche — elle vient de l'objectif, réencodée
+     avant de partir — et la v1 reste publiée telle quelle sous /v1/, sans aucune de ces lignes.
      FICHIER UNIQUE : HTML, CSS et script ensemble,
      AUCUNE ressource externe (DIR-SCAN-18) — pas de CDN, pas de police téléchargée, pas d'image. La politique
      de contenu est portée par cette balise <meta> parce que la page est servie par un hébergeur statique sur
@@ -39,7 +42,8 @@ html { -webkit-text-size-adjust: 100%; }
    photo” est sous le bas de l'écran du téléphone : il faut faire défiler la page pour l'atteindre ». Tenu en
    portrait, l'écran de prise de vue tient donc entier, les deux commandes comprises. Ce que l'avenant change à
    la tenue de la page : la pièce élastique qui se réduisait pour garder le bouton à l'écran — l'aperçu de la
-   caméra — n'existe plus, il n'y a donc plus rien à contraindre par une hauteur définie. Le corps reprend sa
+   caméra — avait été retirée à l'avenant, puis rendue par 1.3b sous une forme bornée (une hauteur maximale,
+   jamais élastique) qui ne commande plus rien. Le corps reprend sa
    hauteur par défaut et le paragraphe de détail sa place : la décision du 2026-10-16 14:43:41 §2 rendait le
    bouton atteignable, l'écart n° 24 du rapport §7.4 lui reprochait de COUPER une réponse longue au lieu de la
    laisser défiler. Les deux sont réconciliés ici : la page est pleine hauteur, rien ne la borde, et les deux
@@ -93,9 +97,10 @@ main {
 .connecte { color: #57d38c; }
 .refus { color: #ff8f8f; }
 .attente { color: #f0c674; }
-/* SCAN-3, AC-1 et avenant AV1 §2 / §3 : la prise de vue est une pile de commandes, plus rien qui regarde la
-   caméra. La section n'est élastique que pour pousser le bloc hors du bas de page si le téléphone en rend une
-   plus petite ; rien, dedans, ne se réduit au point de disparaître. Les deux commandes sont de vrais boutons,
+/* SCAN-3, AC-1 et avenant AV1 §2 / §3 : la prise de vue est une pile de commandes ; depuis 1.3b l'aperçu de
+   l'objectif la surmonte quand la caméra vit (fiche §2, ligne « Ouverture »). La section n'est élastique que
+   pour pousser le bloc hors du bas de page si le téléphone en rend une plus petite ; rien, dedans, ne se
+   réduit au point de disparaître. Les deux commandes sont de vrais boutons,
    atteignables au doigt comme au pouce, et restent dans l'ordre du clavier. */
 .prise {
     display: flex;
@@ -124,6 +129,34 @@ main {
     border-radius: 10px;
 }
 .bouton[disabled] { opacity: 0.55; }
+/* 1.3b, fiche §2 ligne « Ouverture » : l'aperçu de l'objectif ne se montre que pendant que la caméra vit,
+   et borne sa hauteur pour que les deux commandes restent atteignables au doigt sans faire défiler. Ce
+   qu'il affiche n'est jamais ce qui part au PC : la photo vient de l'objectif, pas de ce qui est dessiné
+   ici (fiche §2, ligne « Taille »). « muet » et « playsinline » sont portés par la balise : sans le second,
+   Chrome et Brave lisent le flux en plein écran et la commande de prise sort de l'écran. */
+.apercu {
+    display: block;
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: 42vh;
+    margin: 10px 0 0;
+    object-fit: contain;
+    background: #000;
+    border-radius: 10px;
+}
+.apercu[hidden] { display: none; }
+/* Un vrai bouton caché par l'attribut « hidden » ne se montre plus que si la page le veut : la règle de
+   display ci-dessus gagnerait sinon sur celle du navigateur. #prendre et #declencher s'échangent ainsi. */
+.bouton[hidden] { display: none; }
+/* 1.3b, fiche §2 ligne « Un appui, une photo » : la ligne de mesure de chaque prise, lue entre l'aperçu et
+   les commandes. Vide, elle ne prend aucune place ; remplie, elle se lit sans défiler. */
+#mesure {
+    margin: 6px 0 0;
+    font-size: 15px;
+    color: #b9c0cc;
+    overflow-wrap: anywhere;
+}
+#mesure:empty { display: none; }
 /* Les deux champs de sélection ne se voient pas : ce sont les deux boutons ci-dessus qui les ouvrent, l'un sur
    l'appareil photo arrière du téléphone (l'attribut capture est posé sur le champ), l'autre sur la galerie
    avec plusieurs images à la fois (l'attribut multiple, et aucun capture). Un champ fichier caché par le style
@@ -142,13 +175,27 @@ main {
     <!-- SCAN-3, AC-1 et AC-11, repris par l'avenant AV1 §2 : la prise de vue n'apparaît qu'une fois la session
          ouverte — avant l'appairage il n'y a aucune clef, donc rien à chiffrer. « Scanne la carte » est le titre
          que la fiche impose à AC-11 ; au-dessus, l'état et le détail gardent mot pour mot les phrases de la v1.
-         Les DEUX commandes sont vues dès que cette section paraît, sans rien faire défiler (AC-1) : elles
-         remplacent l'aperçu de la caméra et le sélecteur de secours, tous deux retirés. -->
+         Les DEUX commandes sont vues dès que cette section paraît, sans rien faire défiler (AC-1). 1.3b (fiche
+         §2) rend un aperçu à cette prise de vue : il ne se montre que pendant que l'objectif est ouvert, et
+         borne sa hauteur pour que les commandes restent au doigt. -->
     <section id="prise" class="prise" hidden>
         <h1 class="etat">Scanne la carte</h1>
         <canvas id="toile" width="0" height="0" hidden></canvas>
-        <!-- AC-1, premier chemin : « Prendre une photo » (ouvre l'appareil photo arrière du téléphone). -->
+        <!-- 1.3b, fiche §2 ligne « Ouverture » : l'aperçu de l'objectif, la ligne de mesure et la commande de
+             prise. Les trois sont cachées à l'armement de la section et ne paraissent qu'une fois l'objectif
+             ouvert. L'aperçu est muet et « playsinline » — sans cet attribut, Chrome et Brave lisent le flux en
+             plein écran — et n'a aucun attribut src : le flux lui arrive par la source d'objet posée par le
+             script, ce que relit le test de la page, donc la politique « media-src 'none' » n'a rien à charger. -->
+        <video id="apercu" class="apercu" muted playsinline hidden></video>
+        <!-- 1.3b, fiche §2 ligne « Un appui, une photo » : « Photo n : largeur × hauteur px, t ms », le temps
+             compté de l'appui à la photo rendue, attente derrière la prise précédente comprise. -->
+        <p id="mesure"></p>
+        <!-- AC-1, premier chemin : « Prendre une photo » ouvre la caméra dans la page depuis 1.3b ; après un
+             refus, le même appui ouvre l'appareil photo arrière du téléphone (fiche §2, ligne « Repli »). -->
         <button id="prendre" class="bouton" type="button">Prendre une photo</button>
+        <!-- 1.3b : la commande que l'aperçu rend accessible sous la caméra vivante — un appui, une photo, sans
+             écran de validation et sans que l'objectif se referme. -->
+        <button id="declencher" class="bouton" type="button" hidden>Photo</button>
         <!-- AC-15, second chemin : « Charger des photos » (ouvre la galerie, plusieurs photos à la fois). -->
         <button id="charger" class="bouton" type="button">Charger des photos</button>
         <!-- Les deux champs que les boutons ouvrent, et personne d'autre : #appareil porte capture="environment"
@@ -238,6 +285,17 @@ const MESSAGE_SERIE_COUPEE = "Photos restantes à renvoyer après un nouvel appa
 // Le téléphone n'a pas rendu une image que sa propre appli sait lire : la photo n'est jamais partie, et ce
 // n'est pas un refus du PC. La série passe à la suivante.
 const MESSAGE_ENCODE_IMPOSSIBLE = "Le téléphone n'a pas pu lire cette image.";
+// 1.3b (fiche §2, lignes « Ouverture » et « Repli ») : les deux phrases que la caméra de la page rend au doigt,
+// quand l'objectif est ouvert et quand il a été refusé. Elles n'en remplacent aucune : les sept phrases de la
+// v1 ci-dessus restent mot pour mot (AC-11). Celle du refus dit quoi toucher ensuite, et le nom de l'erreur se
+// lit sur la ligne de détail — « un message en clair (nom de l'erreur compris) », fiche §2, ligne « Repli ».
+const MESSAGE_CAMERA_OUVERTE = "Caméra ouverte. Touche « Photo » pour chaque carte : l'objectif reste ouvert.";
+const MESSAGE_CAMERA_REFUSEE = "La caméra de cette page n'a pas répondu. Touche encore « Prendre une photo » : l'appareil photo du téléphone prendra la carte.";
+// 1.3b (RELECTURE §2 C1) : la file de la caméra n'abandonne pas sur un refus « minute » — le PC refuse avant de
+// compter (TraitementPhoto.cs:215-217), la photo refusée est donc encore bonne. Cette phrase dit lesquelles
+// partiront seules, suivie du compte que la page tient. Elle n'en remplace aucune : la série de la galerie, elle,
+// s'arrête toujours sur la minute et rend son compte par MESSAGE_SERIE_INTERROMPU.
+const MESSAGE_CAMERA_MINUTE = "Le PC a reçu soixante photos dans la minute. Elles partiront seules, photos en attente : ";
 
 // Les refus que le PC sait dire (TraitementPhoto.Motif*, rendus par PagesScan.RefusPhotoEnJson) : la fiche
 // §2, point 6, veut « une réponse chiffrée qui dit pourquoi, sans détail technique ». Ces phrases ne sont pas
@@ -385,6 +443,12 @@ const boutonPrendre = document.getElementById("prendre");
 const boutonCharger = document.getElementById("charger");
 const champAppareil = document.getElementById("appareil");
 const champGalerie = document.getElementById("galerie");
+// 1.3b (fiche §2, ligne « Ouverture ») : les trois pièces que la caméra fait vivre — l'aperçu de l'objectif,
+// la ligne où se lit chaque mesure, et la commande qui déclenche une prise. Les deux premières étaient cachées
+// avec la section ; la commande de prise ne paraît que l'objectif ouvert.
+const apercu = document.getElementById("apercu");
+const boutonDeclencher = document.getElementById("declencher");
+const ligneMesure = document.getElementById("mesure");
 
 // Toute la mémoire de la page. Rien n'y est écrit dans un stockage du navigateur : fermer l'onglet tue la
 // clef, l'identifiant et les compteurs (DIR-SCAN-5 v2, AC-28).
@@ -553,9 +617,11 @@ function envoieLaFin() {
 }
 
 // Couper le battement et oublier le message de fin : après un refus, la clef n'est plus la bonne, il n'y a
-// plus rien à fermer proprement. Ce que la page n'a plus à relâcher (avenant AV1 §3) : elle ne tient plus de
-// flux de caméra — c'est l'application photo du téléphone qui ouvre et referme son objectif, et rien ici ne
-// reste ouvert après la session (DIR-SCAN-5 v2).
+// plus rien à fermer proprement. Ce que la page tenait de plus depuis l'avenant AV1 §3 — rien du tout côté
+// caméra, l'application photo du téléphone ouvrait et refermait son objectif — est devenu faux en 1.3b : la
+// page tient un objectif ouvert, et la fiche §2 (ligne « Arrêt ») veut qu'il soit rendu ici même. Un 401 du
+// battement (« Nouveau code d'appairage » au PC) ferme la session : la caméra s'éteint avec la clef, le témoin
+// vert du téléphone s'éteint aussi (DIR-SCAN-25 c, AC-4).
 function arrete() {
     seance.arret = true;
     if (seance.minuteur !== null) {
@@ -563,6 +629,7 @@ function arrete() {
         seance.minuteur = null;
     }
     seance.messageDeFin = null;
+    coupeLaCamera();
 }
 
 // Un battement : /etat, dont la réponse chiffrée porte l'état de la session (AC-34, AC-36).
@@ -808,13 +875,14 @@ async function sondeAc33(parametres) {
 // effacé, clef non extractible et jamais écrite dans un stockage du navigateur, un seul échange à la fois
 // (seance.enVol), aucune ressource externe, aucun corps texte lisible.
 //
-// Ce qui est retiré à l'avenant AV1 §3, ligne 45 — le code de l'aperçu en direct, l'API de flux et la trame
-// vidéo — et pourquoi, écrit au constat §1 du même avenant : la page demandait la caméra sans résolution et
-// capturait la trame à la taille du flux, donc envoyait une image trop petite pour lire la ligne du bas. Douze
-// photos prises par l'aperçu n'ont rendu aucune « Exacte » ; une photo prise par l'appareil photo du téléphone
-// a fait lire l'édition et le numéro pour la première fois. La page ne demande donc plus aucun flux, ne rend
-// plus d'aperçu, ne dessine plus de trame et ne garde rien à relâcher : les trois mots-clés d'API qui le
-// prouvaient sont d'ailleurs vérifiés absents de ce fichier par le test de la page.
+// Ce que l'avenant AV1 §3 (ligne 45) avait retiré — l'aperçu en direct, l'API de flux, la capture de la trame —
+// et pourquoi, écrit au constat §1 du même avenant : la page demandait la caméra sans résolution et capturait
+// la trame à la taille du flux, donc envoyait une image trop petite pour lire la ligne du bas. Douze photos
+// prises par l'aperçu n'ont rendu aucune « Exacte » ; une photo prise par l'appareil photo du téléphone a fait
+// lire l'édition et le numéro pour la première fois. 1.3b rend l'aperçu à la page, pas ce défaut : la commande
+// d'ouverture demande la taille de prise à l'objectif lui-même (fiche §2, ligne « Taille »), et jamais ce qui
+// est dessiné à l'écran ne devient la photo — c'est un des interdits de la fiche §2 (ligne « Interdits »), et
+// le test de la page le relit.
 //
 // Ce que ce bloc ne prouve pas : qu'un téléphone ouvre bien l'objectif du dos sur « Prendre une photo », qu'il
 // ouvre la galerie avec plusieurs images sur « Charger des photos », et la hauteur réelle que le navigateur
@@ -842,6 +910,20 @@ const serie = {
     total: 0,                      // le n de « photo k sur n », figé au premier tour
     envoyees: 0,                   // le k de « photo k sur n »
     enCours: false                 // une série occupe-t-elle la session ?
+};
+
+// 1.3b (fiche §2, lignes « Ouverture », « Un appui, une photo » et « File d'envoi ») : toute la mémoire de la
+// caméra de la page. Comme la série de la galerie, elle ne tient qu'en mémoire de script — rien n'en survit à
+// la page (DIR-SCAN-5 v2) et rien ne s'écrit sur le téléphone (DIR-SCAN-8, liste de DIR-SCAN-26) : une photo
+// n'existe que dans `file` jusqu'à son envoi.
+const camera = {
+    flux: null,                    // l'objectif ouvert, null quand il ne vit pas
+    capteur: null,                 // ce qui le déclenche, null avec lui
+    file: [],                      // les photos rendues par les appuis, dans leur ordre
+    enCours: false,                // une file de la caméra occupe-t-elle la session ?
+    numero: 0,                     // le n de « Photo n : … » rendu sur la ligne de mesure
+    attente: null,                 // la prise en cours : le prochain appui se range derrière elle
+    refus: ""                      // le dernier refus lu, non vide dès qu'il faut rendre l'appareil natif
 };
 
 // Ce qu'un envoi rend à la série : la suivante mérite sa chance, ou la série s'arrête. Le seul refus du PC qui
@@ -882,6 +964,307 @@ function ouvreLaGalerie() {
     if (serieEnCours())
         return;
     champGalerie.click();
+}
+
+// ————— 1.3b (fiche §2) : la caméra ouverte dans la page, sur l'appui du doigt —————
+//
+// Ce que ce bloc ajoute, et ce qu'il laisse tel quel : l'objectif s'ouvre dans la page et y rend ses photos
+// sans écran de validation, la caméra restant ouverte entre deux cartes. Ce qui part au PC ne change pas d'un
+// octet — chaque photo est réencodée par le chemin déjà payé avant de partir (DIR-SCAN-27), puis chiffrée sur
+// la route /photo avec les mêmes compteurs et les mêmes phrases.
+//
+// L'ordre d'armement est celui de la fiche §2, ligne « Ouverture », qui est aussi celui de DIR-SCAN-24 b : rien
+// n'est demandé au chargement de la page, l'objectif ne s'ouvre que sur l'appui, et le micro n'est jamais
+// demandé. La fiche §2, ligne « Interdits », défend la trame du flux comme origine de la photo : la taille de
+// prise se lit à la place sur les capacités de l'objectif (fiche §2, ligne « Taille »).
+//
+// Ce que ce bloc ne prouve pas : qu'un téléphone ouvre l'objectif du dos sur « Prendre une photo », que la photo
+// rendue mesure 4 032 px de grand côté, que dix appuis d'une série tiennent sous la seconde, que l'objectif
+// s'éteigne quand la page se cache, et ce que dit Brave quand la caméra est refusée. AC-1, AC-2, AC-3, AC-4,
+// AC-5 et AC-7 sont au R-RUN de Thomas (fiche §6) ; les tests de la page ne relisent que son texte.
+
+// La commande « Prendre une photo ». C'est d'elle, et d'elle seule, que la caméra est demandée (DIR-SCAN-24 b) :
+// aucun appel d'ouverture ne part au chargement de la page, et rien d'autre ne la déclenche. Le premier chemin
+// ouvre l'objectif dans la page ; après un refus, la fiche §2 (ligne « Repli ») veut que le même appui rende
+// l'appareil natif du téléphone — la chaîne d'avant, inchangée.
+function surPrendre() {
+    if (serieEnCours())
+        return;
+
+    if (camera.refus !== "") {
+        ouvreLeSelecteurDePrise();
+        return;
+    }
+
+    ouvreLaCamera().catch(function (refus) {
+        camera.refus = (refus && refus.name ? refus.name : "camera") +
+            (refus && refus.message ? " — " + refus.message : "");
+        affiche(MESSAGE_CAMERA_REFUSEE, "refus", camera.refus);
+    });
+}
+
+// L'objectif du dos, et lui seul : « audio: false » (le micro n'est jamais demandé, DIR-SCAN-24 a) et
+// « facingMode » en idéal « environment » (fiche §2, ligne « Ouverture »). Une seule fois dans la page, et
+// jamais au chargement. Le refus n'est pas attrapé ici : c'est la commande qui l'écrit avec le nom de l'erreur,
+// et qui rend l'appareil natif au second appui.
+async function ouvreLaCamera() {
+    const flux = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: "environment" } }
+    });
+
+    // Le flux est tenu dès qu'il est obtenu : tout ce qui suit peut encore refuser, et ce qui a été ouvert doit
+    // être rendu — sinon l'objectif resterait vif sous une page qui ne le montre plus (DIR-SCAN-25). Un
+    // navigateur sans capteur de prise ne rendrait pas la photo demandée : l'objectif repart ici, et le repli
+    // natif répondra au second appui (fiche §2, ligne « Repli »).
+    camera.flux = flux;
+    let piste = null;
+    try {
+        if (typeof ImageCapture !== "function")
+            throw new Error("ImageCapture absent de ce navigateur");
+
+        piste = flux.getVideoTracks()[0];
+        camera.capteur = new ImageCapture(piste);
+        apercu.srcObject = flux;    // le flux arrive par la source d'objet : rien à charger, aucune URL d'objet
+    } catch (capteurManquant) {
+        coupeLaCamera();
+        throw capteurManquant;
+    }
+
+    try {
+        await apercu.play();
+    } catch (apercuRefuse) {
+        // L'aperçu peut refuser de lire. Il ne doit pas pour autant jeter la prise : l'objectif est ouvert et la
+        // commande « Photo » répond — ce que l'écran montre n'entre pas dans la photo.
+    }
+
+    camera.refus = "";
+    camera.numero = 0;
+    ligneMesure.textContent = "";
+    apercu.hidden = false;
+    boutonDeclencher.hidden = false;
+    boutonDeclencher.disabled = serie.enCours;   // une série de la galerie tient la session : « Photo » attend
+    boutonPrendre.hidden = true;                 // la caméra vit : la commande qui l'ouvre ne se montre plus
+
+    const annonce = piste && piste.label ? piste.label : "objectif ouvert";
+    affiche(MESSAGE_CAMERA_OUVERTE, "connecte", annonce);
+}
+
+// Chaque appui sur « Photo » rend une photo, et un appui qui arrive pendant une prise attend son tour (fiche §2,
+// ligne « Un appui, une photo »). Le temps se compte dès l'appui, avant l'attente du tour : c'est le chiffre que
+// le R-RUN compare aux 1 000 ms d'AC-3, attente derrière la prise précédente comprise.
+function auDeclencheur() {
+    const appui = performance.now();
+    camera.numero += 1;
+
+    const numero = camera.numero;
+    const suite = function () {
+        return rendsLaPhoto(appui, numero);
+    };
+    const chaine = camera.attente === null ? Promise.resolve() : camera.attente;
+    camera.attente = chaine.then(suite, suite);
+}
+
+// Une prise, mesurée puis rangée dans la file d'envoi. Ce que la caméra n'a pas rendu se dit, et la carte
+// d'après mérite sa chance, comme dans la série de la galerie.
+async function rendsLaPhoto(appui, numero) {
+    if (camera.capteur === null)
+        return;         // l'objectif a été rendu pendant l'attente : cet appui n'a plus rien à prendre
+
+    const photo = await prendsLaPhoto();
+    const rendu = Math.round(performance.now() - appui);
+    if (photo === null)
+        return;         // la prise a déjà dit ce qui n'a pas marché
+
+    const grandeur = await grandeurDeLaPhoto(photo);
+    ligneMesure.textContent = "Photo " + numero + " : " + grandeur + " px, " + rendu + " ms";
+    rangeLaPhoto(photo);
+}
+
+// La prise réglée à la plus grande taille que l'objectif annonce (fiche §2, ligne « Taille » — l'écart 🟠 du
+// gate 1.3a). Les deux chiffres se lisent dans les capacités du capteur et se passent tels quels à la prise.
+// Si la lecture des capacités ou la prise réglée échoue, la prise part au défaut du navigateur — 3024 × 4032
+// mesurés en 1.3a — et la ligne de mesure rend ce qu'elle a reçu, pas ce qui avait été demandé.
+async function prendsLaPhoto() {
+    const capteur = camera.capteur;
+    if (capteur === null)
+        return null;
+
+    try {
+        const capacites = await capteur.getPhotoCapabilities();
+        return await capteur.takePhoto({
+            imageWidth: capacites.imageWidth.max,
+            imageHeight: capacites.imageHeight.max
+        });
+    } catch (priseRegleeImpossible) {
+        try {
+            return await capteur.takePhoto();
+        } catch (priseImpossible) {
+            // Ni réglée ni au défaut : la photo n'a jamais existé, et le PC n'y est pour rien. Le nom de l'erreur
+            // se lit, comme ailleurs, pour que le R-RUN sache quoi reprocher à qui.
+            affiche(MESSAGE_ENCODE_IMPOSSIBLE, "refus",
+                priseImpossible && priseImpossible.name ? priseImpossible.name : "");
+            return null;
+        }
+    }
+}
+
+// La grandeur de la photo rendue, lue sur la photo elle-même : la ligne de mesure doit dire ce qui part, pas ce
+// qui a été demandé. Cette image ne sert qu'à cette ligne et rend sa mémoire aussitôt — c'est la photo décodée,
+// jamais ce que l'aperçu affiche (fiche §2, ligne « Interdits »).
+async function grandeurDeLaPhoto(photo) {
+    let image = null;
+    try {
+        image = await createImageBitmap(photo);
+        return image.width + " × " + image.height;
+    } catch (photoIllisible) {
+        return "grandeur illisible";
+    } finally {
+        if (image !== null)
+            image.close();     // une image de 4 032 px pèse sa place, et dix appuis peuvent suivre
+    }
+}
+
+// La file d'envoi de la caméra (fiche §2, ligne « File d'envoi ») : la photo rendue attend son tour en mémoire,
+// et « Charger des photos » se ferme tant qu'il en reste une. Deux files en parallèle se marcheraient sur le
+// compteur unique de la session (AC-30) comme sur le seul tour de file du PC (AC-6).
+function rangeLaPhoto(photo) {
+    camera.file.push(photo);
+    boutonCharger.disabled = true;
+
+    if (camera.enCours)
+        return;         // la boucle tourne déjà : ce rang sera pris au tour suivant
+
+    camera.enCours = true;
+    videLaFileDeLaCamera().catch(function (fileSansReponse) {
+        affiche(MESSAGE_TRANSPORT, "attente");
+    });
+}
+
+// La boucle de la file : une photo à la fois ; le Blob rendu par l'objectif est réencodé avant de partir, jamais
+// envoyé tel quel (DIR-SCAN-27) ; et un battement du PC en vol fait attendre la photo, jamais l'abandonner. Elle
+// ne s'arrête que sur une session close — rendue par APRES_ARRET avec seance.arret vrai — et dit alors le compte
+// restant avec les phrases de la série. Sur un refus « minute » (RELECTURE §2 C1), elle ne s'arrête pas : la photo
+// revient en tête de la file, le compte est dit, la boucle attend cinq secondes et la reprend. À un appui par
+// seconde, la caméra atteint les soixante envois par minute du PC : ce refus n'est pas un cas rare.
+async function videLaFileDeLaCamera() {
+    let arretSurLaSession = false;
+
+    try {
+        while (camera.file.length > 0) {
+            const photo = camera.file.shift();
+            const octets = await jpegDuFichier(photo);
+
+            if (octets === null) {
+                leTelephoneNaPasLu();
+                if (seance.arret) {
+                    arretSurLaSession = true;
+                    break;
+                }
+                continue;
+            }
+
+            while (seance.enVol && !seance.arret)
+                await attendsUnCentieme();
+
+            if (await envoieLaPhoto(octets) === APRES_ARRET) {
+                if (seance.arret) {
+                    arretSurLaSession = true;
+                    break;
+                }
+
+                // RELECTURE §2 C1 : refus « minute » sur une session vivante. La photo revient en tête de la file
+                // et la boucle la reprendra après l'attente : rien ne se perd, rien n'est à retoucher.
+                camera.file.unshift(photo);
+                affiche(MESSAGE_CAMERA_MINUTE + camera.file.length, "attente");
+                await attendsCinqSecondes();
+                continue;
+            }
+        }
+    } finally {
+        camera.enCours = false;
+
+        const reste = camera.file.length;
+        if (arretSurLaSession || seance.arret) {
+            camera.file = [];
+            if (reste > 0)
+                finDeLaSerie(reste, arretSurLaSession);
+        }
+
+        rendLesCommandesDeLaCamera();
+    }
+}
+
+// La relecture de « le PC reçoit-il quelque chose en ce moment ? » toutes les cent millisecondes, posée sur une
+// temporisation à fonction : la boucle attend son tour, elle ne jette pas la photo (fiche §2, ligne « File
+// d'envoi »).
+function attendsUnCentieme() {
+    return new Promise(function (reprise) {
+        setTimeout(function () {
+            reprise();
+        }, 100);
+    });
+}
+
+// L'attente de la minute du PC (RELECTURE §2 C1) : cinq secondes posées sur une temporisation à fonction, comme la
+// relecture de « seance.enVol » ci-dessus. La boucle attend son tour, elle ne rappelle pas elle-même la file et ne
+// jette aucune photo ; la file de la caméra reste entière pendant ce temps, et « Charger des photos » reste fermé.
+function attendsCinqSecondes() {
+    return new Promise(function (reprise) {
+        setTimeout(function () {
+            reprise();
+        }, 5000);
+    });
+}
+
+// Les commandes rendues au doigt : « Charger des photos » ne se rouvre que si la série de la galerie et la file
+// de la caméra sont vides toutes deux (fiche §2, ligne « File d'envoi », l'exclusion), et jamais sur une session
+// close — il n'y a plus rien à envoyer.
+function rendLesCommandesDeLaCamera() {
+    if (seance.arret || serie.enCours || camera.enCours || camera.file.length > 0)
+        return;
+
+    boutonCharger.disabled = false;
+    boutonPrendre.disabled = false;
+}
+
+// L'objectif rendu (fiche §2, ligne « Arrêt » ; DIR-SCAN-25) : chaque piste arrêtée une à une, l'aperçu vidé, la
+// commande de prise cachée avec lui et la commande d'ouverture rendue au doigt. Appelée quand la page devient
+// cachée, quand elle part, et quand la session se ferme. Rien d'autre n'est coupé : le micro n'a jamais été
+// demandé, et la file d'envoi n'a rien à voir avec l'objectif — elle sera reprise ou dite au compte restant.
+function coupeLaCamera() {
+    if (camera.flux !== null) {
+        for (const piste of camera.flux.getTracks())
+            piste.stop();
+    }
+
+    camera.flux = null;
+    camera.capteur = null;
+    camera.attente = null;
+    apercu.srcObject = null;
+    apercu.hidden = true;
+    boutonDeclencher.hidden = true;
+    boutonDeclencher.disabled = serie.enCours;
+    boutonPrendre.hidden = false;
+}
+
+// Le gestionnaire de « visibilitychange » : la page cachée — touche d'accueil, écran éteint — rend l'objectif,
+// et le retour trouve un aperçu vide sous « Prendre une photo » ; un appui rouvre (fiche §2, ligne « Arrêt » ;
+// DIR-SCAN-25 a, AC-4). Revenue à vue, la page ne rouvre rien d'elle-même : la caméra ne se demande que sur
+// l'appui (DIR-SCAN-24 b).
+function surVisibilite() {
+    if (document.visibilityState !== "hidden")
+        return;
+
+    coupeLaCamera();
+}
+
+// Le gestionnaire de « pagehide » : /fin tente de partir, puis l'objectif est rendu — « pagehide » couvre
+// l'envoi de /fin (fiche §2, ligne « Arrêt » ; DIR-SCAN-25 b). Sans lui, l'onglet fermé laisserait l'objectif
+// vif jusqu'à ce que le navigateur s'en souvienne.
+function surDepart() {
+    envoieLaFin();
+    coupeLaCamera();
 }
 
 // ————— AC-16 (avenant AV1 §3) : le réencodage part de l'image d'origine du téléphone —————
@@ -976,6 +1359,14 @@ async function chargeLaGalerie(fichiers) {
     if (choisis.length === 0)
         return;
 
+    // 1.3b (fiche §2, ligne « File d'envoi », l'exclusion) : une file de la caméra tient la session, et une
+    // seconde file démarrerait deux envois en parallèle sur le compteur unique de la session (AC-30) comme sur
+    // le seul tour de file du PC (AC-6). La galerie reprendra au doigt, comme sous la v1 pour une série.
+    if (camera.enCours || camera.file.length > 0) {
+        affiche(MESSAGE_SERIE_EN_COURS, "attente", "Une photo prise dans la page est encore en envoi.");
+        return;
+    }
+
     serie.fichiers = choisis;
     serie.total = choisis.length;
     serie.envoyees = 0;
@@ -1003,6 +1394,7 @@ async function videLaSerie() {
     serie.enCours = true;
     boutonCharger.disabled = true;
     boutonPrendre.disabled = true;
+    boutonDeclencher.disabled = true;   // 1.3b, fiche §2 ligne « File d'envoi » : la série tient l'objectif
 
     let arretSurLaSession = false;
     while (serie.fichiers.length > 0) {
@@ -1035,6 +1427,7 @@ async function videLaSerie() {
     if (!seance.arret) {
         boutonCharger.disabled = false;
         boutonPrendre.disabled = false;
+        boutonDeclencher.disabled = false;    // 1.3b : la série rend la commande de prise, comme elle rend les deux autres
     }
 
     if (reste > 0)
@@ -1104,11 +1497,10 @@ async function envoieLaPhoto(octets) {
     } finally {
         seance.enVol = false;
         // Pendant une série, c'est la boucle qui rend les deux commandes en fin de file — pas le premier
-        // tour venu. Une session close ne les rend pas : il n'y a plus rien à envoyer.
-        if (!seance.arret && !serie.enCours) {
-            boutonPrendre.disabled = false;
-            boutonCharger.disabled = false;
-        }
+        // tour venu. Une session close ne les rend pas : il n'y a plus rien à envoyer. 1.3b (fiche §2, ligne
+        // « File d'envoi », l'exclusion) : la file de la caméra compte au même titre que la série de la
+        // galerie, sinon « Charger des photos » se rouvrirait sous une photo qui monte encore.
+        rendLesCommandesDeLaCamera();
     }
 }
 
@@ -1189,14 +1581,24 @@ function renduDeLaPhoto(clair) {
 
 // L'armement de la prise de vue, appelé une fois la session ouverte : avant l'appairage il n'y a aucune clef,
 // donc rien à chiffrer — la fiche §2 ne propose la photo qu'après le QR. Les DEUX commandes s'arment ensemble
-// (AC-1 de l'avenant) : chacune ouvre le sélecteur du téléphone qui la regarde, et rien ici n'attend une
-// caméra qui pourrait ne jamais répondre. Un refus d'état (clef périmée, origine hors liste) n'arme rien : la
-// session est close, l'écran dit déjà pourquoi.
+// (AC-1 de l'avenant, tenu par 1.3b) : chacune ouvre ce qui la regarde, et rien ici n'attend une caméra qui
+// pourrait ne jamais répondre — l'armement n'ouvre rien du tout, c'est l'appui du doigt qui ouvre, et son refus
+// se lit en clair. Un refus d'état (clef périmée, origine hors liste) n'arme rien : la session est close,
+// l'écran dit déjà pourquoi.
 function ouvreLaPrise() {
     sectionPrise.hidden = false;
 
-    // AC-1 : « Prendre une photo » ouvre l'appareil photo arrière — et rien d'autre : ni aperçu, ni flux.
-    boutonPrendre.addEventListener("click", ouvreLeSelecteurDePrise);
+    // 1.3b (fiche §2, ligne « Repli ») : le refus qui avait rendu l'appareil natif appartenait à la session
+    // d'avant ; une session neuve redemande l'objectif dans la page.
+    camera.refus = "";
+
+    // AC-1, depuis 1.3b : « Prendre une photo » ouvre l'objectif dans la page, aperçu compris et micro jamais
+    // demandé. L'appareil photo arrière du téléphone reste armé derrière, comme repli d'après un refus.
+    boutonPrendre.addEventListener("click", surPrendre);
+
+    // 1.3b (fiche §2, ligne « Un appui, une photo ») : la commande que l'aperçu rend accessible — un appui, une
+    // photo, et l'objectif reste ouvert pour la carte d'après.
+    boutonDeclencher.addEventListener("click", auDeclencheur);
 
     // AC-15 : « Charger des photos » ouvre la galerie, plusieurs photos à la fois.
     boutonCharger.addEventListener("click", ouvreLaGalerie);
@@ -1263,7 +1665,8 @@ async function demarre() {
     seance.url = "http://" + hote + ":" + fragment.port;
     seance.identifiant = tireIdentifiantTelephone();
 
-    window.addEventListener("pagehide", envoieLaFin);   // AC-34 : /fin tente de partir à la fermeture
+    window.addEventListener("pagehide", surDepart);     // AC-34 : /fin tente de partir à la fermeture ; 1.3b rend l'objectif avec elle
+    document.addEventListener("visibilitychange", surVisibilite);   // 1.3b, DIR-SCAN-25 a : la page cachée rend l'objectif
 
     affiche("Connexion au PC…", "attente");
     await battement();
