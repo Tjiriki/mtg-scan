@@ -157,6 +157,16 @@ main {
     overflow-wrap: anywhere;
 }
 #mesure:empty { display: none; }
+/* 1.3c, fiche §2 ligne « Compteur » : la ligne des trois chiffres, sous la mesure de chaque prise. Elle se lit sans
+   défiler, comme elle. Vide, elle ne se montre pas : ce n'est pas son texte qui la dit mais l'attribut « hidden »,
+   posé à l'écriture par afficheLeCompteur(), seul écrivain de cette ligne. */
+#compteur {
+    margin: 4px 0 0;
+    font-size: 15px;
+    color: #b9c0cc;
+    overflow-wrap: anywhere;
+}
+#compteur[hidden] { display: none; }
 /* Les deux champs de sélection ne se voient pas : ce sont les deux boutons ci-dessus qui les ouvrent, l'un sur
    l'appareil photo arrière du téléphone (l'attribut capture est posé sur le champ), l'autre sur la galerie
    avec plusieurs images à la fois (l'attribut multiple, et aucun capture). Un champ fichier caché par le style
@@ -190,6 +200,10 @@ main {
         <!-- 1.3b, fiche §2 ligne « Un appui, une photo » : « Photo n : largeur × hauteur px, t ms », le temps
              compté de l'appui à la photo rendue, attente derrière la prise précédente comprise. -->
         <p id="mesure"></p>
+        <!-- 1.3c, fiche §2 ligne « Compteur » (D-7) : « Prises : P · Reçues : R · En attente : A », suivi de
+             « · Refusées : X » quand X dépasse zéro. Caché tant qu'aucune photo n'a été prise — avant, il n'y a rien
+             à compter —, écrit par afficheLeCompteur() seul. -->
+        <p id="compteur" hidden></p>
         <!-- AC-1, premier chemin : « Prendre une photo » ouvre la caméra dans la page depuis 1.3b ; après un
              refus, le même appui ouvre l'appareil photo arrière du téléphone (fiche §2, ligne « Repli »). -->
         <button id="prendre" class="bouton" type="button">Prendre une photo</button>
@@ -276,11 +290,11 @@ const MESSAGE_NON_RECONNUE = "Carte non reconnue — réessayez avec plus de lum
 
 // AVENANT AV1 (AC-1 et AC-15) : les phrases que les DEUX commandes doivent rendre. L'avenant ne les impose pas
 // mot pour mot — seule la ligne « Scanne la carte » de la fiche est citée — mais elles disent quoi faire,
-// jamais un détail technique. Les deux portant un nombre en fin de ligne : AC-15 veut que la page « s'arrête et
-// dise combien de photos restent à renvoyer », et la série ne se reprend pas toute seule — c'est au doigt de
-// retoucher « Charger des photos ».
+// jamais un détail technique. 1.3c (fiche §2, ligne « Deux files ») : la phrase du compte « après la minute » a
+// disparu, une série ne s'interrompt plus pour un refus passager du PC — elle reprend seule. Celle qui reste
+// porte un nombre en fin de ligne : AC-15 veut que la page « dise combien de photos restent à renvoyer » quand
+// la session ferme en cours de route.
 const MESSAGE_SERIE_EN_COURS = "Une série de photos est déjà en cours d'envoi.";
-const MESSAGE_SERIE_INTERROMPU = "Photos restantes à renvoyer après la minute : ";
 const MESSAGE_SERIE_COUPEE = "Photos restantes à renvoyer après un nouvel appairage : ";
 // Le téléphone n'a pas rendu une image que sa propre appli sait lire : la photo n'est jamais partie, et ce
 // n'est pas un refus du PC. La série passe à la suivante.
@@ -291,25 +305,30 @@ const MESSAGE_ENCODE_IMPOSSIBLE = "Le téléphone n'a pas pu lire cette image.";
 // lit sur la ligne de détail — « un message en clair (nom de l'erreur compris) », fiche §2, ligne « Repli ».
 const MESSAGE_CAMERA_OUVERTE = "Caméra ouverte. Touche « Photo » pour chaque carte : l'objectif reste ouvert.";
 const MESSAGE_CAMERA_REFUSEE = "La caméra de cette page n'a pas répondu. Touche encore « Prendre une photo » : l'appareil photo du téléphone prendra la carte.";
-// 1.3b (RELECTURE §2 C1) : la file de la caméra n'abandonne pas sur un refus « minute » — le PC refuse avant de
-// compter (TraitementPhoto.cs:215-217), la photo refusée est donc encore bonne. Cette phrase dit lesquelles
-// partiront seules, suivie du compte que la page tient. Elle n'en remplace aucune : la série de la galerie, elle,
-// s'arrête toujours sur la minute et rend son compte par MESSAGE_SERIE_INTERROMPU.
+// 1.3c (fiche §2, lignes « Deux files » et « Compteur ») : la branche « minute » de la file de la caméra a
+// disparu, la reprise des envois la remplace — cinq secondes entre deux essais, sans limite. Cette phrase est lue
+// depuis P2 sur le refus « minute » du PC, rendue au doigt avec le compte des photos en attente du compteur. Elle
+// n'en remplace aucune.
 const MESSAGE_CAMERA_MINUTE = "Le PC a reçu soixante photos dans la minute. Elles partiront seules, photos en attente : ";
 
 // Les refus que le PC sait dire (TraitementPhoto.Motif*, rendus par PagesScan.RefusPhotoEnJson) : la fiche
 // §2, point 6, veut « une réponse chiffrée qui dit pourquoi, sans détail technique ». Ces phrases ne sont pas
 // de la fiche — elle n'en impose que trois ci-dessus — mais elles disent quoi faire, jamais un nom de
-// méthode, un code HTTP ni un motif ASCII.
+// méthode, un code HTTP ni un motif ASCII. 1.3c (fiche §2, ligne « Refus passagers ») : les quatre motifs qui
+// repartent seuls ne disent plus « retente » — le doigt n'a rien à reprendre.
 const MOTIFS_DE_REFUS = {
     format: "Cette image n'est pas lisible. Prends la carte en photo, ou choisis un JPEG ou un PNG.",
     dimensions: "Cette image est trop grande pour le PC. Reprends la carte en photo.",
-    occupe: "Le PC traite déjà une photo. Attends une seconde, puis retente.",
-    minute: "Trop de photos d'affilée. Attends la minute suivante, puis retente.",
-    erreur: "Le PC n'a pas pu lire la carte. Retente avec plus de lumière et la carte à plat.",
-    indisponible: "La reconnaissance n'est pas ouverte sur ce PC. Ouvre l'écran Scanner, puis retente."
+    occupe: "Le PC traite déjà une photo. La tienne part juste après elle, toute seule.",
+    minute: "Trop de photos d'affilée. La tienne repartira seule dans un instant.",
+    erreur: "Le PC n'a pas pu lire la carte. Elle repartira seule, sans rien toucher.",
+    indisponible: "La reconnaissance n'est pas ouverte sur ce PC. Ouvre l'écran Scanner : la photo repartira seule."
 };
 const MESSAGE_REFUS_INCONNU = "Le PC a refusé la photo sans dire pourquoi.";
+// 1.3c (fiche §2, ligne « Refus passagers ») : les motifs que le PC donne parce qu'il est occupé, et non parce
+// que la photo est mauvaise — la même photo repart seule, cinq secondes plus tard, avec les mêmes octets. Les
+// motifs « format » et « dimensions » ne sont pas ici : les corriger est au doigt, pas à la page.
+const MOTIFS_PASSAGERS = ["minute", "occupe", "erreur", "indisponible"];
 
 // Le seul refus que la page reçoit sans qu'il soit chiffré : la taille du message est jugée avant toute
 // lecture (ServeurScanLocal.LireMessage), sous le plafond de quinze mégaoctets commun aux quatre routes.
@@ -449,6 +468,8 @@ const champGalerie = document.getElementById("galerie");
 const apercu = document.getElementById("apercu");
 const boutonDeclencher = document.getElementById("declencher");
 const ligneMesure = document.getElementById("mesure");
+// 1.3c (fiche §2, ligne « Compteur ») : la ligne d'à côté, celle des trois chiffres de la session.
+const ligneCompteur = document.getElementById("compteur");
 
 // Toute la mémoire de la page. Rien n'y est écrit dans un stockage du navigateur : fermer l'onglet tue la
 // clef, l'identifiant et les compteurs (DIR-SCAN-5 v2, AC-28).
@@ -926,10 +947,34 @@ const camera = {
     refus: ""                      // le dernier refus lu, non vide dès qu'il faut rendre l'appareil natif
 };
 
-// Ce qu'un envoi rend à la série : la suivante mérite sa chance, ou la série s'arrête. Le seul refus du PC qui
-// oblige à s'arrêter est « minute » — soixante envois sont déjà partis dans la minute, le tour d'après les
-// acceptera (AC-7 côté PC). Tout ce qui ferme la session arrête pareil : il n'y a plus de clef pour chiffrer.
+// 1.3c (fiche §2, ligne « Compteur », D-7) : les trois chiffres que le doigt lit sous la ligne de mesure. Comme la
+// file et la série, ils ne tiennent qu'en mémoire de script — rien n'en survit à la page (DIR-SCAN-5 v2, la liste de
+// DIR-SCAN-26). Rien n'y est jamais remis à zéro : une session close laisse les photos restantes en « attente » (D-8).
+const compteur = {
+    prises: 0,                     // chaque photo rendue par un appui, chaque photo choisie dans la galerie
+    recues: 0,                     // chaque réponse du PC qui n'est pas un refus
+    refusees: 0                    // 413, refus définitif, réponse illisible, photo que le téléphone n'a pas lue
+};
+
+// Le seul écrivain de la ligne du compteur (fiche §2, ligne « Compteur ») : « Prises : P · Reçues : R · En attente : A »,
+// suivi de « · Refusées : X » seulement quand X dépasse zéro (décision de Thomas du 2026-11-17). A n'est pas un
+// quatrième chiffre mais ce qui reste des prises — les photos de la file, et celles qu'une session close laisse
+// derrière elles (D-8). La ligne paraît à la première prise et ne se cache plus : un compte revenu à zéro se lit.
+function afficheLeCompteur() {
+    ligneCompteur.textContent = "Prises : " + compteur.prises
+        + " · Reçues : " + compteur.recues
+        + " · En attente : " + (compteur.prises - compteur.recues - compteur.refusees)
+        + (compteur.refusees > 0 ? " · Refusées : " + compteur.refusees : "");
+    ligneCompteur.hidden = compteur.prises === 0;
+}
+
+// Ce qu'un envoi rend à la file qui le porte (1.3c, fiche §2, ligne « Trois issues ») : trois issues, pas deux.
+// APRES_CONTINUE — la photo est partie, ou écartée d'autorité pour sa forme ou sa taille : la suivante mérite sa
+// chance. APRES_REPRISE — la photo n'est pas arrivée et le PC ne lui reproche rien (transport manqué, réponse non
+// 2xx, refus passager) : elle repart seule, cinq secondes plus tard, avec les mêmes octets en main. APRES_ARRET —
+// la session est close, il n'y a plus de clef pour chiffrer : la file s'arrête et dit son compte.
 const APRES_CONTINUE = "continue";
+const APRES_REPRISE = "reprise";
 const APRES_ARRET = "arret";
 
 // Un champ de sélection rendu vide. Sans ce geste, retoucher le bouton sur la même photo ne rendrait aucun
@@ -1130,6 +1175,10 @@ async function grandeurDeLaPhoto(photo) {
 // compteur unique de la session (AC-30) comme sur le seul tour de file du PC (AC-6).
 function rangeLaPhoto(photo) {
     camera.file.push(photo);
+    // 1.3c (fiche §2, ligne « Compteur ») : la prise est comptée au rang où elle est rangée — le doigt lit « Prises »
+    // dès son appui, avant même que la file la rende.
+    compteur.prises += 1;
+    afficheLeCompteur();
     boutonCharger.disabled = true;
 
     if (camera.enCours)
@@ -1142,11 +1191,11 @@ function rangeLaPhoto(photo) {
 }
 
 // La boucle de la file : une photo à la fois ; le Blob rendu par l'objectif est réencodé avant de partir, jamais
-// envoyé tel quel (DIR-SCAN-27) ; et un battement du PC en vol fait attendre la photo, jamais l'abandonner. Elle
-// ne s'arrête que sur une session close — rendue par APRES_ARRET avec seance.arret vrai — et dit alors le compte
-// restant avec les phrases de la série. Sur un refus « minute » (RELECTURE §2 C1), elle ne s'arrête pas : la photo
-// revient en tête de la file, le compte est dit, la boucle attend cinq secondes et la reprend. À un appui par
-// seconde, la caméra atteint les soixante envois par minute du PC : ce refus n'est pas un cas rare.
+// envoyé tel quel (DIR-SCAN-27) ; et un envoi qui échoue reprend seul avec les mêmes octets — c'est
+// envoieJusquAuBout qui attend, non cette boucle (1.3c, fiche §2, lignes « Reprise » et « Deux files »). Elle ne
+// s'arrête que sur une session close — rendue par APRES_ARRET avec seance.arret vrai — et dit alors le compte
+// restant avec la phrase de la série, la photo en cours comprise. À un appui par seconde, la caméra atteint les
+// soixante envois par minute du PC : ce refus n'est plus une fin de file, c'est un refus passager du PC.
 async function videLaFileDeLaCamera() {
     let arretSurLaSession = false;
 
@@ -1157,6 +1206,10 @@ async function videLaFileDeLaCamera() {
 
             if (octets === null) {
                 leTelephoneNaPasLu();
+                // 1.3c (fiche §2, ligne « Compteur ») : une photo que le téléphone ne sait pas lire n'ira jamais au
+                // PC. Elle est refusée, pas en attente — « En attente » ne doit rien promettre de lui.
+                compteur.refusees += 1;
+                afficheLeCompteur();
                 if (seance.arret) {
                     arretSurLaSession = true;
                     break;
@@ -1164,21 +1217,12 @@ async function videLaFileDeLaCamera() {
                 continue;
             }
 
-            while (seance.enVol && !seance.arret)
-                await attendsUnCentieme();
-
-            if (await envoieLaPhoto(octets) === APRES_ARRET) {
-                if (seance.arret) {
-                    arretSurLaSession = true;
-                    break;
-                }
-
-                // RELECTURE §2 C1 : refus « minute » sur une session vivante. La photo revient en tête de la file
-                // et la boucle la reprendra après l'attente : rien ne se perd, rien n'est à retoucher.
+            if (await envoieJusquAuBout(octets) === APRES_ARRET) {
+                // Le compte que le finally rend au doigt comprend la photo en cours (fiche §2, ligne
+                // « Deux files ») : elle revient en tête de la file avant qu'il le lise.
                 camera.file.unshift(photo);
-                affiche(MESSAGE_CAMERA_MINUTE + camera.file.length, "attente");
-                await attendsCinqSecondes();
-                continue;
+                arretSurLaSession = true;
+                break;
             }
         }
     } finally {
@@ -1196,8 +1240,8 @@ async function videLaFileDeLaCamera() {
 }
 
 // La relecture de « le PC reçoit-il quelque chose en ce moment ? » toutes les cent millisecondes, posée sur une
-// temporisation à fonction : la boucle attend son tour, elle ne jette pas la photo (fiche §2, ligne « File
-// d'envoi »).
+// temporisation à fonction : la boucle attend son tour, elle ne jette pas la photo (fiche §2, lignes « File
+// d'envoi » et « Reprise »).
 function attendsUnCentieme() {
     return new Promise(function (reprise) {
         setTimeout(function () {
@@ -1206,9 +1250,10 @@ function attendsUnCentieme() {
     });
 }
 
-// L'attente de la minute du PC (RELECTURE §2 C1) : cinq secondes posées sur une temporisation à fonction, comme la
-// relecture de « seance.enVol » ci-dessus. La boucle attend son tour, elle ne rappelle pas elle-même la file et ne
-// jette aucune photo ; la file de la caméra reste entière pendant ce temps, et « Charger des photos » reste fermé.
+// L'attente entre deux essais d'un même envoi (1.3c, décision de Thomas du 2026-11-17 : cinq secondes, sans
+// limite) : cinq secondes posées sur une temporisation à fonction, comme la relecture de « seance.enVol »
+// ci-dessus. La boucle attend son tour, elle ne rappelle pas elle-même la file et ne jette aucune photo ; la file
+// de la caméra reste entière pendant ce temps, et « Charger des photos » reste fermé.
 function attendsCinqSecondes() {
     return new Promise(function (reprise) {
         setTimeout(function () {
@@ -1337,17 +1382,13 @@ function enAttente(champ) {
     return (champ.files && champ.files.length) ? Array.prototype.slice.call(champ.files) : [];
 }
 
-// AC-1, premier chemin, la suite du geste : la prise validée par l'application photo est réencodée depuis
-// l'original qu'elle vient de rendre (AC-16), puis envoyée. Une prise annulée ne rend aucun événement change :
-// cette fonction n'est pas appelée, et rien ne part.
-async function unePhotoDuTelephone(fichier) {
-    const octets = await jpegDuFichier(fichier);
-    if (octets === null) {
-        leTelephoneNaPasLu();
-        return;
-    }
-
-    await envoieLaPhoto(octets);
+// AC-1, premier chemin, la suite du geste : la prise validée par l'application photo est rangée dans la file de
+// la caméra (1.3c, fiche §2, ligne « Appareil natif »). C'est là qu'elle est réencodée depuis l'original rendu
+// par le téléphone (AC-16, DIR-SCAN-27), qu'elle part au tour, et qu'elle reprend seule si l'envoi échoue — plus
+// d'envoi au feu unique qui rendait « continuer » sur un transport manqué. Une prise annulée ne rend aucun
+// événement change : cette fonction n'est pas appelée, et rien ne part.
+function unePhotoDuTelephone(fichier) {
+    rangeLaPhoto(fichier);
 }
 
 // AC-15 : « Les photos choisies partent une par une, chacune après la réponse de la précédente. » Toute la file
@@ -1367,29 +1408,33 @@ async function chargeLaGalerie(fichiers) {
         return;
     }
 
+    // 1.3c (fiche §2, ligne « Compteur ») : la série compte ses n photos dès qu'elles sont choisies, avant le premier
+    // envoi — « En attente » les dit toutes, y compris derrière un envoi qui reprend.
+    compteur.prises += choisis.length;
+    afficheLeCompteur();
+
     serie.fichiers = choisis;
     serie.total = choisis.length;
     serie.envoyees = 0;
     await videLaSerie();
 }
 
-// AC-15, fin du chemin : « Sur un refus “minute”, la page s'arrête et dit combien de photos restent à
-// renvoyer. » La série ne se reprend pas toute seule — la page ne tient pas d'horloge en attente de la minute
-// du PC — mais le compte est dit, et le nom du bouton à retoucher. Quand ce n'est plus la minute qu'il faut
-// attendre mais un nouveau code d'appairage, la phrase le dit aussi : la clef n'est plus la bonne.
+// AC-15, fin du chemin : « la page ... dit combien de photos restent à renvoyer », et le compte comprend la photo
+// en cours (1.3c, fiche §2, ligne « Deux files »). Elle ne le dit plus que sur une session close — un nouveau code
+// d'appairage est alors le seul geste. Un refus « minute » ne l'interrompt plus : la reprise des envois la reprend
+// seule, les mêmes octets en main.
 function finDeLaSerie(reste, sessionClosee) {
-    if (sessionClosee) {
-        affiche(MESSAGE_SERIE_COUPEE + reste, "refus");
-        return;
-    }
+    if (!sessionClosee)
+        return;     // plus rien ne coupe une file hors session close : il n'y a donc rien d'autre à rendre
 
-    affiche(MESSAGE_SERIE_INTERROMPU + reste, "attente");
+    affiche(MESSAGE_SERIE_COUPEE + reste, "refus");
 }
 
-// La boucle de la série. Elle s'arrête sur le refus « minute » du PC (AC-15) et sur tout ce qui ferme la
-// session ; ailleurs elle passe à la suivante, y compris quand le PC n'a pas reconnu la carte ou n'a pas pu la
-// lire — les cartes d'après méritent leur chance. Ce qu'elle ne fait pas : reprendre toute seule plus tard, ni
-// envoyer deux photos dans le même tour de file (AC-6).
+// La boucle de la série. Elle s'arrête sur tout ce qui ferme la session ; ailleurs elle passe à la suivante, y
+// compris quand le PC n'a pas reconnu la carte ou n'a pas pu la lire — les cartes d'après méritent leur chance.
+// Un envoi qui échoue reprend seul, avec les mêmes octets (1.3c, fiche §2, lignes « Reprise » et « Deux files ») :
+// une coupure du réseau n'interrompt plus le cours d'une série. Ce qu'elle ne fait pas : envoyer deux photos dans
+// le même tour de file (AC-6).
 async function videLaSerie() {
     serie.enCours = true;
     boutonCharger.disabled = true;
@@ -1405,6 +1450,10 @@ async function videLaSerie() {
         const octets = await jpegDuFichier(fichier);
         if (octets === null) {
             leTelephoneNaPasLu();
+            // 1.3c (fiche §2, ligne « Compteur ») : pareillement pour la série — la photo est comptée en refusées et
+            // la boucle passe à la suivante.
+            compteur.refusees += 1;
+            afficheLeCompteur();
             if (seance.arret) {
                 arretSurLaSession = true;
                 break;
@@ -1412,8 +1461,11 @@ async function videLaSerie() {
             continue;
         }
 
-        if (await envoieLaPhoto(octets) === APRES_ARRET) {
-            arretSurLaSession = seance.arret;
+        if (await envoieJusquAuBout(octets) === APRES_ARRET) {
+            // Le compte rendu en fin de série comprend la photo en cours (fiche §2, ligne « Deux files ») : elle
+            // revient en tête de la file avant qu'il le lise.
+            serie.fichiers.unshift(fichier);
+            arretSurLaSession = true;
             break;
         }
     }
@@ -1434,22 +1486,43 @@ async function videLaSerie() {
         finDeLaSerie(reste, arretSurLaSession);
 }
 
+// L'envoi d'une photo jusqu'au bout (1.3c, fiche §2, ligne « Reprise ») : la seule fonction qui appelle
+// envoieLaPhoto. Elle attend que le tour se libère, envoie, et tant que l'envoi rend APRES_REPRISE elle attend
+// cinq secondes et renvoie les MÊMES octets — jamais elle ne relit le fichier ni ne réencode (D-6 : un second
+// réencodage rendrait une image différente, et le PC écarte déjà un renvoi par son empreinte, D-5). Elle rend ce
+// que l'envoi rend, donc APRES_CONTINUE ou APRES_ARRET seulement.
+async function envoieJusquAuBout(octets) {
+    for (;;) {
+        while (seance.enVol && !seance.arret)
+            await attendsUnCentieme();
+
+        const rendu = await envoieLaPhoto(octets);
+        if (rendu !== APRES_REPRISE)
+            return rendu;
+
+        await attendsCinqSecondes();
+    }
+}
+
 // Une photo au PC : scellée pour /photo, un seul échange à la fois. Le verrou est celui du battement
 // (seance.enVol), et le PC en tient la raison : un seul compteur par sens (AC-30), et AC-6 ne laisse qu'une
 // photo en cours. Un battement qui survient pendant l'envoi passe son tour, comme sous la v1.
 //
-// AC-15 ajoute ce que la fonction REND à la série : APRES_CONTINUE quand la photo n'a pas été reconnue, quand
-// le PC l'a refusée pour sa forme ou sa taille, et quand le transport a manqué — la carte d'après mérite sa
-// chance ; APRES_ARRET quand le PC répond « minute » (il a déjà compté soixante envois, AC-7) et quand la
-// session vient de se fermer, faute de clef valide ou d'origine admise.
+// AC-15, puis 1.3c (fiche §2, ligne « Trois issues »), ce que la fonction REND à envoieJusquAuBout :
+// APRES_REPRISE quand la photo n'est pas arrivée et que le PC ne lui reproche rien — transport manqué, réponse
+// non 2xx hors 401, 403 et 413, refus passager du PC, ou tour déjà occupé ; APRES_CONTINUE quand elle est partie
+// ou écartée d'autorité (413 jugé sur la taille, refus de sa forme, réponse illisible) ; APRES_ARRET quand la
+// session vient de se fermer, faute de clef valide ou d'origine admise. Le rendu de renduDeLaPhoto passe tel
+// quel, APRES_REPRISE compris.
 async function envoieLaPhoto(octets) {
     if (seance.arret) {
         affiche(ETATS.deconnecte, "refus");
         return APRES_ARRET;
     }
     if (seance.enVol) {
+        // Le tour est pris : la photo n'est pas perdue, elle repartira au prochain essai de la reprise.
         affiche("Le PC est déjà en train de recevoir quelque chose.", "attente", "Attends une seconde, puis retente.");
-        return APRES_ARRET;
+        return APRES_REPRISE;
     }
 
     seance.enVol = true;
@@ -1461,8 +1534,12 @@ async function envoieLaPhoto(octets) {
         const reponse = await envoie(ROUTE_PHOTO, message, null);
 
         if (reponse.status === 413) {
-            // Le seul refus qui ne soit pas chiffré : la taille du message est jugée avant lecture.
+            // Le seul refus qui ne soit pas chiffré : la taille du message est jugée avant lecture. 1.3c (fiche §2,
+            // lignes « Trois issues » et « Compteur ») : il se compte en « Refusées » et ne repart jamais — renvoyer
+            // les mêmes octets les rendrait aussi lourds (AC-7).
             affiche(MESSAGE_IMAGE_TROP_GROSSE, "refus");
+            compteur.refusees += 1;
+            afficheLeCompteur();
             return APRES_CONTINUE;
         }
         if (reponse.status === 403) {
@@ -1477,8 +1554,10 @@ async function envoieLaPhoto(octets) {
             return APRES_ARRET;
         }
         if (!reponse.ok) {
+            // 500, 503, un port qui claque : le PC n'a rien à reprocher à la photo, elle repart (1.3c, fiche §2,
+            // ligne « Trois issues »).
             affiche(MESSAGE_TRANSPORT, "attente");
-            return APRES_CONTINUE;
+            return APRES_REPRISE;
         }
 
         const clair = await ouvreReponse(ROUTE_PHOTO, new Uint8Array(await reponse.arrayBuffer()));
@@ -1490,10 +1569,12 @@ async function envoieLaPhoto(octets) {
         }
 
         const rendu = renduDeLaPhoto(clair);
-        return (seance.arret || rendu === APRES_ARRET) ? APRES_ARRET : APRES_CONTINUE;
+        return seance.arret ? APRES_ARRET : rendu;
     } catch (photoSansReponse) {
+        // Le transport a manqué — le Wi-Fi du téléphone est peut-être tombé : la photo repart, pas sautée
+        // (1.3c, fiche §2, ligne « Trois issues »).
         affiche(MESSAGE_TRANSPORT, "attente");
-        return APRES_CONTINUE;
+        return APRES_REPRISE;
     } finally {
         seance.enVol = false;
         // Pendant une série, c'est la boucle qui rend les deux commandes en fin de file — pas le premier
@@ -1508,10 +1589,10 @@ async function envoieLaPhoto(octets) {
 // (« exacte », « a_choisir », « non_reconnue » — PagesScan.NiveauSurLeFil) ne se montrent jamais : ici, des
 // phrases en français. Un niveau que cette page ne connaît pas se dit, il ne se peint pas en vert.
 //
-// AC-15 (avenant AV1 §3) ajoute ce que la fonction REND à la série de la galerie : le seul motif de refus qui
-// l'oblige à s'arrêter est « minute » — le PC a déjà compté soixante envois dans la minute (AC-7) et les
-// suivants partiront au tour d'après. Une carte non reconnue, un format refusé, une image trop grande pour le
-// PC : la photo d'après mérite sa chance.
+// AC-15 (avenant AV1 §3), puis 1.3c (fiche §2, ligne « Refus passagers »), ce que la fonction REND à l'envoi :
+// APRES_REPRISE pour les quatre motifs que MOTIFS_PASSAGERS nomme — le PC est occupé, la photo ne l'est pas —,
+// et ils rendent leur phrase sans « retente ». Une carte non reconnue, un format refusé, une image trop grande
+// pour le PC, un motif que la page ne connaît pas : APRES_CONTINUE, la photo d'après mérite sa chance.
 function renduDeLaPhoto(clair) {
     let recu;
     try {
@@ -1521,12 +1602,14 @@ function renduDeLaPhoto(clair) {
     }
 
     if (recu === null || typeof recu !== "object") {
+        // Une réponse qui n'est pas du JSON n'est pas un accusé du PC : la page ne sait rien de la photo, et le
+        // compteur le dit en « Refusées » (1.3c, fiche §2, ligne « Compteur »). Elle ne repart pas — un second envoi
+        // se heurterait à la même réponse.
         affiche(MESSAGE_REFUS, "refus");
+        compteur.refusees += 1;
+        afficheLeCompteur();
         return APRES_CONTINUE;
     }
-
-    if (typeof recu.refus === "string" && recu.refus === "minute")
-        return APRES_ARRET;
 
     // SCAN-FIX P3 : le PC met la photo à l'abri et répond tout de suite ; la reconnaissance se fait ensuite, et
     // son résultat arrive par le battement d'état (suiviDesPhotos). « recu » est l'empreinte de la photo : elle
@@ -1536,18 +1619,34 @@ function renduDeLaPhoto(clair) {
         affiche("Photo reçue par le PC.", "connecte",
             attente > 1 ? attente + " photos en attente de reconnaissance — tu peux continuer."
                         : "Reconnaissance en cours — tu peux prendre la suivante.");
+        // 1.3c (fiche §2, ligne « Compteur ») : « Reçues » monte à cet accusé du PC. Le résultat de la
+        // reconnaissance, qui arrive par le battement d'état, ne compte pas une seconde fois.
+        compteur.recues += 1;
+        afficheLeCompteur();
         return APRES_CONTINUE;
     }
 
+    // La phrase du refus se rend dans les deux cas : le doigt lit pourquoi, que la photo reparte ou non. 1.3c
+    // (fiche §2, ligne « Refus passagers ») : sur « minute », elle rend de plus le compte des photos en attente du
+    // compteur — la photo en cours est déjà dedans, elle est prise et non reçue. La soustraction est relue ici
+    // plutôt que prêtée à afficheLeCompteur(), qui écrit la ligne du compteur sans en rendre de chiffre. Le motif
+    // qui n'est pas passager (« format », « dimensions », un motif inconnu) est un refus définitif : compté en
+    // « Refusées », il rend sa phrase au doigt et la ligne du compteur se relit avec, hors d'attente.
     if (typeof recu.refus === "string") {
-        affiche(
-            Object.prototype.hasOwnProperty.call(MOTIFS_DE_REFUS, recu.refus)
-                ? MOTIFS_DE_REFUS[recu.refus]
-                : MESSAGE_REFUS_INCONNU,
-            "refus");
+        const connue = Object.prototype.hasOwnProperty.call(MOTIFS_DE_REFUS, recu.refus);
+        const enAttente = compteur.prises - compteur.recues - compteur.refusees;
+        affiche(recu.refus === "minute" ? MESSAGE_CAMERA_MINUTE + enAttente
+            : connue ? MOTIFS_DE_REFUS[recu.refus] : MESSAGE_REFUS_INCONNU, "refus");
+        if (MOTIFS_PASSAGERS.includes(recu.refus))
+            return APRES_REPRISE;
+        compteur.refusees += 1;
+        afficheLeCompteur();
         return APRES_CONTINUE;
     }
 
+    // Les niveaux que le PC rend (fiche §2, ligne « Réponse au téléphone ») : la photo est reçue à chacun, reconnue
+    // ou non. 1.3c (fiche §2, ligne « Compteur ») compte donc chaque réponse de niveau en « Reçues », la phrase du
+    // doigt rendue d'abord et la ligne du compteur relue avec.
     const nom = typeof recu.nom === "string" ? recu.nom : "";
     if (recu.niveau === "exacte") {
         // « Reconnue : <nom> (<CODE> #<n°>) », le gabarit de la fiche, et le code d'extension seul — AC-2 ne
@@ -1557,6 +1656,8 @@ function renduDeLaPhoto(clair) {
             ? " (" + recu.extension + (typeof recu.numero === "string" ? " #" + recu.numero : "") + ")"
             : "";
         affiche(MESSAGE_RECONNUE + nom + code, "connecte");
+        compteur.recues += 1;
+        afficheLeCompteur();
         return APRES_CONTINUE;
     }
 
@@ -1567,15 +1668,22 @@ function renduDeLaPhoto(clair) {
         // dit au rapport du lot, pas comblé par un champ ajouté au protocole d'AC-2 sans personne.
         affiche(MESSAGE_A_CHOISIR, "attente",
             (nom === "" ? "" : nom + " — ") + "choisis l'impression sur l'écran du PC.");
+        compteur.recues += 1;
+        afficheLeCompteur();
         return APRES_CONTINUE;
     }
 
     if (recu.niveau === "non_reconnue") {
         affiche(MESSAGE_NON_RECONNUE, "refus");
+        compteur.recues += 1;
+        afficheLeCompteur();
         return APRES_CONTINUE;
     }
 
+    // Un niveau que cette page ne connaît pas n'est pas un refus du PC : la photo est bien chez lui.
     affiche("Le PC a répondu un niveau que cette page ne connaît pas.", "refus");
+    compteur.recues += 1;
+    afficheLeCompteur();
     return APRES_CONTINUE;
 }
 
@@ -1611,9 +1719,10 @@ function ouvreLaPrise() {
         if (fichiers.length === 0)
             return;
 
-        unePhotoDuTelephone(fichiers[0]).catch(function (imprevu) {
-            leTelephoneNaPasLu();
-        });
+        // 1.3c (fiche §2, ligne « Appareil natif ») : la prise se range dans la file de la caméra, qui la garde
+        // jusqu'à son envoi, la réencode et la reprend seule si l'envoi échoue — plus rien à rattraper ici, et la
+        // prise illisible se dit dans la file (leTelephoneNaPasLu).
+        unePhotoDuTelephone(fichiers[0]);
     });
 
     // La galerie a rendu n fichiers : ils partent une par une, chacun après la réponse du précédent (AC-15).
