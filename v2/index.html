@@ -1020,8 +1020,8 @@ function ouvreLaGalerie() {
 //
 // L'ordre d'armement est celui de la fiche §2, ligne « Ouverture », qui est aussi celui de DIR-SCAN-24 b : rien
 // n'est demandé au chargement de la page, l'objectif ne s'ouvre que sur l'appui, et le micro n'est jamais
-// demandé. La fiche §2, ligne « Interdits », défend la trame du flux comme origine de la photo : la taille de
-// prise se lit à la place sur les capacités de l'objectif (fiche §2, ligne « Taille »).
+// demandé. La fiche §2, ligne « Interdits », défend la trame du flux comme origine de la photo : la photo vient
+// de prendsLaPhoto(), à la taille par défaut de l'objectif.
 //
 // Ce que ce bloc ne prouve pas : qu'un téléphone ouvre l'objectif du dos sur « Prendre une photo », que la photo
 // rendue mesure 4 032 px de grand côté, que dix appuis d'une série tiennent sous la seconde, que l'objectif
@@ -1126,31 +1126,23 @@ async function rendsLaPhoto(appui, numero) {
     rangeLaPhoto(photo);
 }
 
-// La prise réglée à la plus grande taille que l'objectif annonce (fiche §2, ligne « Taille » — l'écart 🟠 du
-// gate 1.3a). Les deux chiffres se lisent dans les capacités du capteur et se passent tels quels à la prise.
-// Si la lecture des capacités ou la prise réglée échoue, la prise part au défaut du navigateur — 3024 × 4032
-// mesurés en 1.3a — et la ligne de mesure rend ce qu'elle a reçu, pas ce qui avait été demandé.
+// La prise rendue à la taille par défaut de l'objectif, sans aucun réglage de taille. Réglée au maximum que
+// l'objectif annonce, elle fait passer le Pixel 9 en 3072 × 4080 : l'aperçu saute et la photo part décalée vers
+// la gauche. Au défaut le téléphone rend 3024 × 4032, grand côté 4 032 — ce que l'envoi sait lire (AC-16), et la
+// ligne de mesure rend ce qu'elle a reçu, pas ce qui avait été demandé.
 async function prendsLaPhoto() {
     const capteur = camera.capteur;
     if (capteur === null)
         return null;
 
     try {
-        const capacites = await capteur.getPhotoCapabilities();
-        return await capteur.takePhoto({
-            imageWidth: capacites.imageWidth.max,
-            imageHeight: capacites.imageHeight.max
-        });
-    } catch (priseRegleeImpossible) {
-        try {
-            return await capteur.takePhoto();
-        } catch (priseImpossible) {
-            // Ni réglée ni au défaut : la photo n'a jamais existé, et le PC n'y est pour rien. Le nom de l'erreur
-            // se lit, comme ailleurs, pour que le R-RUN sache quoi reprocher à qui.
-            affiche(MESSAGE_ENCODE_IMPOSSIBLE, "refus",
-                priseImpossible && priseImpossible.name ? priseImpossible.name : "");
-            return null;
-        }
+        return await capteur.takePhoto();
+    } catch (priseImpossible) {
+        // Le défaut de l'objectif n'a rien rendu : la photo n'a jamais existé, et le PC n'y est pour rien. Le nom
+        // de l'erreur se lit, comme ailleurs, pour que le R-RUN sache quoi reprocher à qui.
+        affiche(MESSAGE_ENCODE_IMPOSSIBLE, "refus",
+            priseImpossible && priseImpossible.name ? priseImpossible.name : "");
+        return null;
     }
 }
 
