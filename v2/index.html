@@ -900,10 +900,11 @@ async function sondeAc33(parametres) {
 // et pourquoi, écrit au constat §1 du même avenant : la page demandait la caméra sans résolution et capturait
 // la trame à la taille du flux, donc envoyait une image trop petite pour lire la ligne du bas. Douze photos
 // prises par l'aperçu n'ont rendu aucune « Exacte » ; une photo prise par l'appareil photo du téléphone a fait
-// lire l'édition et le numéro pour la première fois. 1.3b rend l'aperçu à la page, pas ce défaut : la commande
-// d'ouverture demande la taille de prise à l'objectif lui-même (fiche §2, ligne « Taille »), et jamais ce qui
-// est dessiné à l'écran ne devient la photo — c'est un des interdits de la fiche §2 (ligne « Interdits »), et
-// le test de la page le relit.
+// lire l'édition et le numéro pour la première fois. 1.3b rend l'aperçu à la page, pas ce défaut : la demande
+// d'ouverture demande la grande taille à l'objectif (SCAN-PHOTOS, 2026-11-21), la photo ne se prend dans la
+// trame du flux qu'autant que son grand côté atteint celui de l'envoi, et jamais la taille que le navigateur
+// dessine à l'écran ne devient la photo — c'est un des interdits de la fiche §2 (ligne « Interdits »), et le
+// test de la page le relit.
 //
 // Ce que ce bloc ne prouve pas : qu'un téléphone ouvre bien l'objectif du dos sur « Prendre une photo », qu'il
 // ouvre la galerie avec plusieurs images sur « Charger des photos », et la hauteur réelle que le navigateur
@@ -940,6 +941,8 @@ const serie = {
 const camera = {
     flux: null,                    // l'objectif ouvert, null quand il ne vit pas
     capteur: null,                 // ce qui le déclenche, null avec lui
+    grandCoteDuFlux: 0,            // le grand côté du flux obtenu, 0 quand il n'est pas lu : la trame ne vaut
+                                   // photo qu'autant qu'il atteint la taille de l'envoi (COTE_ENVOYE)
     file: [],                      // les photos rendues par les appuis, dans leur ordre
     enCours: false,                // une file de la caméra occupe-t-elle la session ?
     numero: 0,                     // le n de « Photo n : … » rendu sur la ligne de mesure
@@ -1020,8 +1023,9 @@ function ouvreLaGalerie() {
 //
 // L'ordre d'armement est celui de la fiche §2, ligne « Ouverture », qui est aussi celui de DIR-SCAN-24 b : rien
 // n'est demandé au chargement de la page, l'objectif ne s'ouvre que sur l'appui, et le micro n'est jamais
-// demandé. La fiche §2, ligne « Interdits », défend la trame du flux comme origine de la photo : la photo vient
-// de prendsLaPhoto(), à la taille par défaut de l'objectif.
+// demandé. La fiche §2, ligne « Interdits », ne défend plus la trame du flux comme origine de la photo : la photo
+// vient de prendsLaPhoto() — dans le flux quand il tient le grand côté de l'envoi, à la taille par défaut de
+// l'objectif sinon — et jamais de la taille que le navigateur dessine à l'écran.
 //
 // Ce que ce bloc ne prouve pas : qu'un téléphone ouvre l'objectif du dos sur « Prendre une photo », que la photo
 // rendue mesure 4 032 px de grand côté, que dix appuis d'une série tiennent sous la seconde, que l'objectif
@@ -1099,7 +1103,10 @@ async function ouvreLaCamera() {
     boutonPrendre.hidden = true;                 // la caméra vit : la commande qui l'ouvre ne se montre plus
 
     // La taille réelle du flux se lit au R-RUN : c'est elle, pas la demande, qui dit si l'aperçu tient la prise.
+    // Son grand côté se garde aussi pour la prise : la trame ne se demande à l'objectif qu'autant qu'il atteint
+    // la taille de l'envoi. Illisible ici, il reste à 0 — la trame ne vaut rien et l'appui natif rend la photo.
     const reglages = piste && typeof piste.getSettings === "function" ? piste.getSettings() : {};
+    camera.grandCoteDuFlux = reglages.width && reglages.height ? Math.max(reglages.width, reglages.height) : 0;
     const tailleDuFlux = reglages.width && reglages.height ? " — flux " + reglages.width + " × " + reglages.height : "";
     const annonce = (piste && piste.label ? piste.label : "objectif ouvert") + tailleDuFlux;
     affiche(MESSAGE_CAMERA_OUVERTE, "connecte", annonce);
@@ -1126,27 +1133,55 @@ async function rendsLaPhoto(appui, numero) {
     if (camera.capteur === null)
         return;         // l'objectif a été rendu pendant l'attente : cet appui n'a plus rien à prendre
 
-    const photo = await prendsLaPhoto();
+    const prise = await prendsLaPhoto();
     const rendu = Math.round(performance.now() - appui);
-    if (photo === null)
+    if (prise === null)
         return;         // la prise a déjà dit ce qui n'a pas marché
 
-    const grandeur = await grandeurDeLaPhoto(photo);
-    ligneMesure.textContent = "Photo " + numero + " : " + grandeur + " px, " + rendu + " ms";
-    rangeLaPhoto(photo);
+    // La ligne de mesure nomme le chemin qui a rendu la carte, « flux » ou « prise » : le R-RUN d'AC-2 relit du
+    // même coup si l'objectif a été reconfiguré sous le doigt, et donc si le flou revient.
+    const grandeur = await grandeurDeLaPhoto(prise.photo);
+    ligneMesure.textContent = "Photo " + numero + " : " + grandeur + " px, " + rendu + " ms, " + prise.source;
+    rangeLaPhoto(prise.photo);
 }
 
-// La prise rendue à la taille par défaut de l'objectif, sans aucun réglage de taille. Réglée au maximum que
-// l'objectif annonce, elle fait passer le Pixel 9 en 3072 × 4080 : l'aperçu saute et la photo part décalée vers
-// la gauche. Au défaut le téléphone rend 3024 × 4032, grand côté 4 032 — ce que l'envoi sait lire (AC-16), et la
-// ligne de mesure rend ce qu'elle a reçu, pas ce qui avait été demandé.
+// La photo, rendue dans le flux quand il tient déjà la taille de l'envoi. Demander la prise à l'objectif à
+// l'appui le reconfigure : l'aperçu saute et la mise au point se perd — la carte part floue. Le flux, lui, tient
+// 3024 × 4032 depuis la demande en grande taille : sa trame se lit sans rien reconfigurer, donc sans saut ni
+// mise au point perdue. Elle ne vaut photo qu'à ce prix — le grand côté du flux atteint et la toile hors écran
+// disponible — sinon la prise se demande à la taille par défaut de l'objectif, sans aucun réglage de taille :
+// réglée au maximum que l'objectif annonce, elle faisait passer le Pixel 9 en 3072 × 4080, l'aperçu sautait et
+// la photo partait décalée vers la gauche ; au défaut le téléphone rend 3024 × 4032, grand côté 4 032, ce que
+// l'envoi sait lire (AC-16). Ce qui est rendu porte le nom du chemin emprunté, « flux » ou « prise », et la
+// ligne de mesure le recopie : elle dit ce qui a rendu la carte, pas ce qui avait été demandé.
 async function prendsLaPhoto() {
     const capteur = camera.capteur;
     if (capteur === null)
         return null;
 
+    if (camera.grandCoteDuFlux >= COTE_ENVOYE && typeof OffscreenCanvas === "function") {
+        let trame = null;
+        try {
+            trame = await capteur.grabFrame();
+            // La toile hors écran reprend la taille de la trame : son grand côté est celui de l'envoi, aucun
+            // redimensionnement n'y entre et le détail de la carte reste entier. Le JPEG se fabrique hors écran,
+            // sans canvas de la page et sans URL d'objet (DIR-SCAN-26, « img-src 'none' »).
+            const horsEcran = new OffscreenCanvas(trame.width, trame.height);
+            horsEcran.getContext("2d").drawImage(trame, 0, 0);
+            const jpeg = await horsEcran.convertToBlob({ type: "image/jpeg", quality: 0.95 });
+            if (jpeg !== null)
+                return { photo: jpeg, source: "flux" };
+        } catch (trameRefusee) {
+            // La trame n'a pas été rendue, ou pas encodée : l'objectif a pu être rendu pendant l'attente, ou la
+            // mémoire a été refusée. Reste la prise native, dont le nom de l'erreur se lira comme ci-dessous.
+        } finally {
+            if (trame !== null)
+                trame.close();     // une bitmap de 4 032 px pèse sa place, et dix appuis peuvent suivre
+        }
+    }
+
     try {
-        return await capteur.takePhoto();
+        return { photo: await capteur.takePhoto(), source: "prise" };
     } catch (priseImpossible) {
         // Le défaut de l'objectif n'a rien rendu : la photo n'a jamais existé, et le PC n'y est pour rien. Le nom
         // de l'erreur se lit, comme ailleurs, pour que le R-RUN sache quoi reprocher à qui.
@@ -1158,7 +1193,7 @@ async function prendsLaPhoto() {
 
 // La grandeur de la photo rendue, lue sur la photo elle-même : la ligne de mesure doit dire ce qui part, pas ce
 // qui a été demandé. Cette image ne sert qu'à cette ligne et rend sa mémoire aussitôt — c'est la photo décodée,
-// jamais ce que l'aperçu affiche (fiche §2, ligne « Interdits »).
+// jamais la taille que le navigateur dessine à l'écran (fiche §2, ligne « Interdits »).
 async function grandeurDeLaPhoto(photo) {
     let image = null;
     try {
@@ -1287,6 +1322,7 @@ function coupeLaCamera() {
 
     camera.flux = null;
     camera.capteur = null;
+    camera.grandCoteDuFlux = 0;    // le flux n'est plus : sa trame ne vaut plus photo, l'appui natif reprend seul
     camera.attente = null;
     apercu.srcObject = null;
     apercu.hidden = true;
