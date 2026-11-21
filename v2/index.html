@@ -1052,10 +1052,17 @@ function surPrendre() {
 // « facingMode » en idéal « environment » (fiche §2, ligne « Ouverture »). Une seule fois dans la page, et
 // jamais au chargement. Le refus n'est pas attrapé ici : c'est la commande qui l'écrit avec le nom de l'erreur,
 // et qui rend l'appareil natif au second appui.
+// Le flux est demandé en grande taille (SCAN-PHOTOS, 2026-11-21) : au défaut, l'aperçu tourne en 480 × 640 et la
+// prise reconfigure l'objectif à l'appui — l'aperçu saute, la photo part décalée et floue. « ideal » ne refuse
+// rien : un téléphone qui ne tient pas cette taille rend la plus proche.
 async function ouvreLaCamera() {
     const flux = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: { facingMode: { ideal: "environment" } }
+        video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 4032 },
+            height: { ideal: 3024 }
+        }
     });
 
     // Le flux est tenu dès qu'il est obtenu : tout ce qui suit peut encore refuser, et ce qui a été ouvert doit
@@ -1091,7 +1098,10 @@ async function ouvreLaCamera() {
     boutonDeclencher.disabled = serie.enCours;   // une série de la galerie tient la session : « Photo » attend
     boutonPrendre.hidden = true;                 // la caméra vit : la commande qui l'ouvre ne se montre plus
 
-    const annonce = piste && piste.label ? piste.label : "objectif ouvert";
+    // La taille réelle du flux se lit au R-RUN : c'est elle, pas la demande, qui dit si l'aperçu tient la prise.
+    const reglages = piste && typeof piste.getSettings === "function" ? piste.getSettings() : {};
+    const tailleDuFlux = reglages.width && reglages.height ? " — flux " + reglages.width + " × " + reglages.height : "";
+    const annonce = (piste && piste.label ? piste.label : "objectif ouvert") + tailleDuFlux;
     affiche(MESSAGE_CAMERA_OUVERTE, "connecte", annonce);
 }
 
